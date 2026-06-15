@@ -1,0 +1,4 @@
+Manifest.toml
+
+# Agent working memory (not package content)
+.claude/
