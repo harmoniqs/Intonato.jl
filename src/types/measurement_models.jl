@@ -48,10 +48,7 @@ Evaluate measurement functions on the model-side trajectory at each knot index.
 """
 function model_predict(traj::NamedTrajectory, model::MeasurementModel)
     return [
-        Measurement(
-            model.measurements[j](traj[k][model.state_name]),
-            k
-        )
-        for (j, k) in enumerate(model.indices)
+        Measurement(model.measurements[j](traj[k][model.state_name]), k) for
+        (j, k) in enumerate(model.indices)
     ]
 end

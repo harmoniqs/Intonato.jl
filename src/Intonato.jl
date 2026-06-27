@@ -49,7 +49,8 @@ include("problems/test.jl")
 # Types
 export Measurement, MeasurementModel
 export AbstractExperiment, SimulatedExperiment, HardwareExperiment
-export AbstractMeasurement, DeterministicMeasurement, ShotNoiseMeasurement, KnownCovarianceMeasurement
+export AbstractMeasurement,
+    DeterministicMeasurement, ShotNoiseMeasurement, KnownCovarianceMeasurement
 export pauli_covariance, population_covariance, wigner_covariance
 export pauli, pop
 export AbstractHardwareBackend
@@ -81,7 +82,8 @@ export AbstractDeviceModel, NominalModel, predict, adapt!
 # IdentityStrategy stand-in. Concrete tuning strategies plug in via this
 # interface.
 export AbstractPulseTuningProblem, AbstractTuningStrategy, IdentityStrategy, step
-export prepare_strategy, tuning_goal, candidate_trajectory, last_timings, accepts_global_data
+export prepare_strategy,
+    tuning_goal, candidate_trajectory, last_timings, accepts_global_data
 
 # Closed-loop tuning chassis. The chassis is strategy-generic; its
 # result/record types are public.

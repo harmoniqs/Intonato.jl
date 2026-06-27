@@ -75,7 +75,7 @@ struct HardwareExperiment <: AbstractExperiment
     run::Function   # (pulse::AbstractPulse) → Vector{Measurement}
     # Optional measurement model used only to annotate logged ExperimentRecords.
     # `nothing` when the user's `run` closure owns the measurement structure.
-    measurement_model::Union{Nothing, MeasurementModel}
+    measurement_model::Union{Nothing,MeasurementModel}
 end
 
 HardwareExperiment(run::Function) = HardwareExperiment(run, nothing)
@@ -97,7 +97,8 @@ function run_experiment(
 )
     measurements = exp.run(pulse)
     if !(logger isa NullExperimentLogger)
-        model = isnothing(exp.measurement_model) ?
+        model =
+            isnothing(exp.measurement_model) ?
             _placeholder_measurement_model(measurements) : exp.measurement_model
         _maybe_record!(logger, exp, pulse, model, measurements; device = "hardware")
     end
@@ -194,23 +195,18 @@ fidelity using a single number-operator generator on the full space.
   authoritative value via a per-subsystem free-phase fidelity that grid-searches
   each independent phase generator separately.
 """
-function phase_max_fidelity(
-    ψ_T::AbstractVector,
-    ψ_goal::AbstractVector;
-    n_grid::Int = 128,
-)
+function phase_max_fidelity(ψ_T::AbstractVector, ψ_goal::AbstractVector; n_grid::Int = 128)
     d = length(ψ_T)
     @assert length(ψ_goal) == d "ψ_T and ψ_goal must have the same length"
     F_max = 0.0
-    @inbounds for i in 0:(n_grid - 1)
+    @inbounds for i = 0:(n_grid-1)
         φ = 2π * i / n_grid
         s = zero(ComplexF64)
-        for k in 0:(d - 1)
-            s += conj(cis(k * φ) * ψ_goal[k + 1]) * ψ_T[k + 1]
+        for k = 0:(d-1)
+            s += conj(cis(k * φ) * ψ_goal[k+1]) * ψ_T[k+1]
         end
         F = abs2(s)
         F > F_max && (F_max = F)
     end
     return F_max
 end
-

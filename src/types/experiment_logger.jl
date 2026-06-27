@@ -70,8 +70,9 @@ record!(lg::InMemoryExperimentLogger, r::ExperimentRecord) = push!(lg.records, r
     σz = ComplexF64[1 0; 0 -1]
     sys = QuantumSystem(1.0 * σz, [σx], [1.0])
 
-    N = 11; T = 5.0
-    times = range(0.0, T, length=N) |> collect
+    N = 11;
+    T = 5.0
+    times = range(0.0, T, length = N) |> collect
     ψ0 = ComplexF64[1.0, 0.0]
     ψg = ComplexF64[0.0, 1.0]
     pulse = LinearSplinePulse(0.1 * ones(1, N), times)

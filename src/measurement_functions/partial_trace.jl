@@ -16,7 +16,7 @@ function partial_trace_B(ρ_iso::AbstractVector, dims::Tuple{Int,Int})
 
     # Trace over B: ρ_A[i_A, j_A] = Σ_b ρ_tensor[b, i_A, b, j_A]
     ρ_A = zeros(eltype(ρ), d_A, d_A)
-    for b in 1:d_B
+    for b = 1:d_B
         ρ_A .+= ρ_tensor[b, :, b, :]
     end
 

@@ -8,7 +8,7 @@ Compute level populations |ψ_j|² from iso-vec ket (Re(ψ), Im(ψ)).
 function populations(x::AbstractVector)
     n = length(x) ÷ 2
     x_re = @view x[1:n]
-    x_im = @view x[n+1:2n]
+    x_im = @view x[(n+1):2n]
     return x_re .^ 2 .+ x_im .^ 2
 end
 
@@ -69,10 +69,7 @@ end
 
 Compute expectations for multiple observables.
 """
-function observable_expectations(
-    x_iso::AbstractVector,
-    Os_iso::Vector{<:AbstractMatrix},
-)
+function observable_expectations(x_iso::AbstractVector, Os_iso::Vector{<:AbstractMatrix})
     return [dot(x_iso, O * x_iso) for O in Os_iso]
 end
 

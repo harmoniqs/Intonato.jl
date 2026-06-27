@@ -32,7 +32,7 @@ end
 Parity operator Π = (-1)^(a†a) = diag(1, -1, 1, -1, …).
 """
 function _parity_operator(n_max::Int)
-    return Diagonal([iseven(n) ? 1.0 : -1.0 for n in 0:n_max-1])
+    return Diagonal([iseven(n) ? 1.0 : -1.0 for n = 0:(n_max-1)])
 end
 
 """
@@ -42,7 +42,7 @@ Bosonic annihilation operator a in the Fock basis.
 """
 function _annihilation_operator(n_max::Int)
     a = zeros(ComplexF64, n_max, n_max)
-    for n in 1:n_max-1
+    for n = 1:(n_max-1)
         a[n, n+1] = sqrt(n)
     end
     return a
@@ -54,6 +54,6 @@ end
 Create a closure g(x_iso) → [displaced_parity(x_iso, α)] for MeasurementModel.
 """
 displaced_parity_at(α::Complex; n_max::Int) =
-    x_iso -> [displaced_parity(x_iso, α; n_max=n_max)]
+    x_iso -> [displaced_parity(x_iso, α; n_max = n_max)]
 
 # ──── Tests ──────────────────────────────────────────────────────────────────

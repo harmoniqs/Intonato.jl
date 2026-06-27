@@ -12,7 +12,7 @@ function truncate_pulse(pulse::ZeroOrderPulse, t_end::Real)
     return ZeroOrderPulse(
         get_knot_values(pulse)[:, mask],
         times[mask];
-        drive_name=pulse.drive_name,
+        drive_name = pulse.drive_name,
     )
 end
 
@@ -28,7 +28,7 @@ function truncate_pulse(pulse::LinearSplinePulse, t_end::Real)
         t = vcat(t, Float64(t_end))
     end
 
-    return LinearSplinePulse(u, t; drive_name=pulse.drive_name)
+    return LinearSplinePulse(u, t; drive_name = pulse.drive_name)
 end
 
 function truncate_pulse(pulse::CubicSplinePulse, t_end::Real)
@@ -46,7 +46,7 @@ function truncate_pulse(pulse::CubicSplinePulse, t_end::Real)
         t = vcat(t, Float64(t_end))
     end
 
-    return CubicSplinePulse(u, du, t; drive_name=pulse.drive_name)
+    return CubicSplinePulse(u, du, t; drive_name = pulse.drive_name)
 end
 
 # ============================================================================ #
