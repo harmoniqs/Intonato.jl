@@ -26,7 +26,7 @@ dispatched away at compile time — `NominalModel` carries no learned parameters
 - `ψ_init::K`: initial state
 - `ψ_goal::G`: goal state
 """
-struct NominalModel{S, K, G} <: AbstractDeviceModel
+struct NominalModel{S,K,G} <: AbstractDeviceModel
     system::S            # QuantumSystem / OpenQuantumSystem
     ψ_init::K
     ψ_goal::G
@@ -71,12 +71,13 @@ adapt!(m::NominalModel, ::AbstractPulse, ::Any) = m   # no-op via dispatch
     σz = ComplexF64[1 0; 0 -1]
     sys = QuantumSystem(1.0 * σz, [σx], [1.0])
 
-    N = 11; T = 5.0
-    times = range(0.0, T, length=N) |> collect
+    N = 11;
+    T = 5.0
+    times = range(0.0, T, length = N) |> collect
     ψ0 = ComplexF64[1.0, 0.0]
     ψg = ComplexF64[0.0, 1.0]
     pulse = LinearSplinePulse(0.1 * ones(1, N), times)
-    model = MeasurementModel(:ψ̃, [full_state for _ in 1:N], collect(1:N))
+    model = MeasurementModel(:ψ̃, [full_state for _ = 1:N], collect(1:N))
 
     # A NominalModel wraps a QuantumSystem; predict rolls the pulse through it
     # and evaluates the measurement model. adapt! is a no-op.

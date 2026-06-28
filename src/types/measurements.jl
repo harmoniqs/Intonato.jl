@@ -20,5 +20,5 @@ Base.length(m::Measurement) = length(m.data)
 Sum of squared differences between two measurement collections.
 """
 function measurement_error(y1::Vector{Measurement}, y2::Vector{Measurement})
-    return sum(sum((m1.data .- m2.data).^2) for (m1, m2) in zip(y1, y2))
+    return sum(sum((m1.data .- m2.data) .^ 2) for (m1, m2) in zip(y1, y2))
 end

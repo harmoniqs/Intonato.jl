@@ -64,7 +64,7 @@ end
 Covariance for Pauli expectation measurements `⟨σ_j⟩`.
 `Var[⟨σ_j⟩] = (1 - ⟨σ_j⟩²) / n_shots` (since σ_j² = I for Pauli matrices).
 """
-pauli_covariance(y, n) = Diagonal((1 .- y.^2) ./ n)
+pauli_covariance(y, n) = Diagonal((1 .- y .^ 2) ./ n)
 
 """
     population_covariance(y, n_shots) → Matrix
@@ -81,7 +81,7 @@ Covariance for Wigner / displaced parity measurements.
 `Var[W(α)] = (1 - W(α)²) / n_shots` (Rademacher mean).
 Same formula as Pauli, different physics.
 """
-wigner_covariance(y, n) = Diagonal((1 .- y.^2) ./ n)
+wigner_covariance(y, n) = Diagonal((1 .- y .^ 2) ./ n)
 
 # ============================================================================ #
 #                      Measurement presets
@@ -93,9 +93,10 @@ wigner_covariance(y, n) = Diagonal((1 .- y.^2) ./ n)
 Pauli expectation measurement preset. Returns `DeterministicMeasurement` when
 `n_shots` is omitted, `ShotNoiseMeasurement` with `pauli_covariance` otherwise.
 """
-function pauli(ops; n_shots::Union{Nothing, Int} = nothing)
+function pauli(ops; n_shots::Union{Nothing,Int} = nothing)
     g = expect(ops)
-    isnothing(n_shots) ? DeterministicMeasurement(g) : ShotNoiseMeasurement(g, n_shots, pauli_covariance)
+    isnothing(n_shots) ? DeterministicMeasurement(g) :
+    ShotNoiseMeasurement(g, n_shots, pauli_covariance)
 end
 
 """
@@ -104,8 +105,9 @@ end
 Population measurement preset. Returns `DeterministicMeasurement` when
 `n_shots` is omitted, `ShotNoiseMeasurement` with `population_covariance` otherwise.
 """
-function pop(; n_shots::Union{Nothing, Int} = nothing)
-    isnothing(n_shots) ? DeterministicMeasurement(populations) : ShotNoiseMeasurement(populations, n_shots, population_covariance)
+function pop(; n_shots::Union{Nothing,Int} = nothing)
+    isnothing(n_shots) ? DeterministicMeasurement(populations) :
+    ShotNoiseMeasurement(populations, n_shots, population_covariance)
 end
 
 # ============================================================================ #

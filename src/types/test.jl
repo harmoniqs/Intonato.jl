@@ -15,7 +15,7 @@
     N = 11
 
     # New API: pass AbstractMeasurement directly
-    m = pauli([σx_iso, σy_iso, σz_iso]; n_shots=1000)
+    m = pauli([σx_iso, σy_iso, σz_iso]; n_shots = 1000)
     model = MeasurementModel(:ψ̃, [m], [N])
     @test model.measurements[1] isa ShotNoiseMeasurement
     @test length(model.measurements) == 1
@@ -29,7 +29,8 @@
     ψ_iso = Intonato.ket_to_iso(ComplexF64[1.0, 0.0])
     traj = NamedTrajectory(
         (ψ̃ = repeat(ψ_iso, 1, N), u = zeros(1, N), Δt = fill(0.1, 1, N));
-        timestep=:Δt, controls=(:u,)
+        timestep = :Δt,
+        controls = (:u,),
     )
     y = model_predict(traj, model_compat)
     @test length(y) == 1
@@ -51,15 +52,15 @@ end
 
     @test Σ isa Diagonal
     @test size(Σ) == (3, 3)
-    @test Σ[1,1] ≈ (1 - 0.25) / 1000   # (1 - 0.5²) / 1000
-    @test Σ[2,2] ≈ (1 - 0.09) / 1000   # (1 - 0.3²) / 1000
-    @test Σ[3,3] ≈ (1 - 0.64) / 1000   # (1 - 0.8²) / 1000
+    @test Σ[1, 1] ≈ (1 - 0.25) / 1000   # (1 - 0.5²) / 1000
+    @test Σ[2, 2] ≈ (1 - 0.09) / 1000   # (1 - 0.3²) / 1000
+    @test Σ[3, 3] ≈ (1 - 0.64) / 1000   # (1 - 0.8²) / 1000
 
     # Edge: y = ±1 → variance → 0
     Σ_edge = pauli_covariance([1.0, -1.0, 0.0], 100)
-    @test Σ_edge[1,1] ≈ 0.0 atol=1e-15
-    @test Σ_edge[2,2] ≈ 0.0 atol=1e-15
-    @test Σ_edge[3,3] ≈ 1/100  # maximum variance at equator
+    @test Σ_edge[1, 1] ≈ 0.0 atol=1e-15
+    @test Σ_edge[2, 2] ≈ 0.0 atol=1e-15
+    @test Σ_edge[3, 3] ≈ 1/100  # maximum variance at equator
 end
 
 @testitem "population_covariance formula" begin
@@ -72,9 +73,9 @@ end
     Σ = population_covariance(p, n)
 
     @test size(Σ) == (2, 2)
-    @test Σ[1,1] ≈ 0.7 * 0.3 / 500     # p(1-p)/N
-    @test Σ[2,2] ≈ 0.3 * 0.7 / 500
-    @test Σ[1,2] ≈ -0.7 * 0.3 / 500     # -p_j*p_k/N
+    @test Σ[1, 1] ≈ 0.7 * 0.3 / 500     # p(1-p)/N
+    @test Σ[2, 2] ≈ 0.3 * 0.7 / 500
+    @test Σ[1, 2] ≈ -0.7 * 0.3 / 500     # -p_j*p_k/N
     @test issymmetric(Σ)
 end
 
@@ -92,7 +93,7 @@ end
     sn = ShotNoiseMeasurement(g, 100, pauli_covariance)
     @test sn(x) == [1.0, 4.0, 9.0]
 
-    kc = KnownCovarianceMeasurement(g, zeros(3,3))
+    kc = KnownCovarianceMeasurement(g, zeros(3, 3))
     @test kc(x) == [1.0, 4.0, 9.0]
 end
 
@@ -110,7 +111,7 @@ end
     @test m_det isa DeterministicMeasurement
 
     # pauli with n_shots → ShotNoise
-    m_sn = pauli(ops; n_shots=1000)
+    m_sn = pauli(ops; n_shots = 1000)
     @test m_sn isa ShotNoiseMeasurement
     @test m_sn.n_shots == 1000
 
@@ -121,7 +122,7 @@ end
     # pop presets
     p_det = pop()
     @test p_det isa DeterministicMeasurement
-    p_sn = pop(; n_shots=500)
+    p_sn = pop(; n_shots = 500)
     @test p_sn isa ShotNoiseMeasurement
     @test p_sn.n_shots == 500
 end
@@ -138,7 +139,7 @@ end
     # number states with DIFFERENT n. Use a superposition so a *relative* phase
     # on |1⟩ degrades the raw overlap but is exactly removable by the free phase.
     ψ_goal = ComplexF64[1.0, 1.0] / sqrt(2)             # (|0⟩+|1⟩)/√2
-    ψ_T    = ComplexF64[1.0, cis(0.7)] / sqrt(2)        # (|0⟩+e^{i·0.7}|1⟩)/√2
+    ψ_T = ComplexF64[1.0, cis(0.7)] / sqrt(2)        # (|0⟩+e^{i·0.7}|1⟩)/√2
 
     raw = abs2(dot(ψ_goal, ψ_T))
     F = phase_max_fidelity(ψ_T, ψ_goal)
@@ -152,4 +153,3 @@ end
     # A genuine population mismatch can't be fixed by a phase: F < 1.
     @test phase_max_fidelity(ComplexF64[0.0, 1.0], ψ_goal) < 0.75
 end
-

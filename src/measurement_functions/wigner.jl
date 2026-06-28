@@ -24,8 +24,8 @@ function _wigner_from_density(ρ::AbstractMatrix, α::Complex, n_max::Int)
     x = 4 * abs2(α)
     W = 0.0
 
-    for m in 0:n_max-1
-        for n in 0:n_max-1
+    for m = 0:(n_max-1)
+        for n = 0:(n_max-1)
             if m >= n
                 # L_n^{m-n}(x) via recurrence
                 k = m - n  # order of associated Laguerre
@@ -66,7 +66,7 @@ function _laguerre(n::Int, k::Int, x)
     L_prev2 = one(x)
     L_prev1 = 1 + k - x
 
-    for i in 2:n
+    for i = 2:n
         L_curr = ((2i - 1 + k - x) * L_prev1 - (i - 1 + k) * L_prev2) / i
         L_prev2 = L_prev1
         L_prev1 = L_curr
@@ -82,6 +82,6 @@ using SpecialFunctions: loggamma
 
 Create a closure g(ρ_iso) → [W(α)] for use in MeasurementModel.
 """
-wigner_at(α::Complex; n_max::Int) = ρ_iso -> [wigner(ρ_iso, α; n_max=n_max)]
+wigner_at(α::Complex; n_max::Int) = ρ_iso -> [wigner(ρ_iso, α; n_max = n_max)]
 
 # ──── Tests ──────────────────────────────────────────────────────────────────

@@ -41,7 +41,7 @@ end
 
     N = 11
     T = 5.0
-    times = range(0.0, T, length=N) |> collect
+    times = range(0.0, T, length = N) |> collect
 
     ψ_init = ComplexF64[1.0, 0.0]
     ψ_goal = ComplexF64[0.0, 1.0]
@@ -82,7 +82,7 @@ end
 
     N = 11
     T = 5.0
-    times = range(0.0, T, length=N) |> collect
+    times = range(0.0, T, length = N) |> collect
 
     ψ_init = ComplexF64[1.0, 0.0]
     ψ_goal = ComplexF64[0.0, 1.0]

@@ -49,7 +49,7 @@ end
     # Single-qubit Rabi fixture (mirrors src/device_models/abstract.jl).
     N = 11
     T = 5.0
-    times = range(0.0, T, length=N) |> collect
+    times = range(0.0, T, length = N) |> collect
     somepulse = LinearSplinePulse(0.1 * ones(1, N), times)
     model = MeasurementModel(:ψ̃, [populations], [N])
     ms = [Measurement([0.7, 0.3], N)]
@@ -59,10 +59,17 @@ end
         measurement_model = model,
         measurements = ms,
         raw = nothing,
-        metadata = (; device="sim", shots=[1000, 1000], basis=:Z,
-                      timestamp="2026-06-14T00:00:00", config_hash="abc",
-                      calibration="nominal", seed=42, versions="Manifest:def",
-                      pulse_hash="ghi"),
+        metadata = (;
+            device = "sim",
+            shots = [1000, 1000],
+            basis = :Z,
+            timestamp = "2026-06-14T00:00:00",
+            config_hash = "abc",
+            calibration = "nominal",
+            seed = 42,
+            versions = "Manifest:def",
+            pulse_hash = "ghi",
+        ),
     )
 
     @test rec.pulse === somepulse
@@ -74,11 +81,7 @@ end
     @test rec.metadata.shots == [1000, 1000]
 
     # `raw` and `metadata` are optional (kwdef defaults).
-    rec2 = ExperimentRecord(
-        pulse = somepulse,
-        measurement_model = model,
-        measurements = ms,
-    )
+    rec2 = ExperimentRecord(pulse = somepulse, measurement_model = model, measurements = ms)
     @test rec2.raw === nothing
     @test rec2.metadata == (;)
 end

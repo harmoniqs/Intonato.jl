@@ -23,10 +23,7 @@ struct IterationRecord
     # Per-phase wall-clock timings (seconds) for this outer iteration.
     # `nlp` is the inner subproblem solve; `total` excludes post-iter
     # rollout/record overhead. Phases that didn't run for a given iter stay 0.0.
-    timing::NamedTuple{
-        (:experiment, :sysid, :nlp, :armijo, :total),
-        NTuple{5, Float64},
-    }
+    timing::NamedTuple{(:experiment, :sysid, :nlp, :armijo, :total),NTuple{5,Float64}}
 end
 
 """
@@ -63,8 +60,12 @@ poorly-converged warm-start is wasteful. Silently passes if `fidelity` isn't
 defined for the QCP type. Pass `threshold = 0` to skip. `path_label` is used
 only in log messages.
 """
-function _check_nominal_fidelity(qcp, threshold::Real;
-                                 verbose::Bool, path_label::AbstractString)
+function _check_nominal_fidelity(
+    qcp,
+    threshold::Real;
+    verbose::Bool,
+    path_label::AbstractString,
+)
     threshold > 0 || return nothing
     F_nom = try
         Piccolo.fidelity(qcp)
@@ -78,7 +79,7 @@ function _check_nominal_fidelity(qcp, threshold::Real;
             "min_nominal_fidelity ($threshold). The QCP likely did not " *
             "converge — running $path_label on this pulse is wasteful. " *
             "Either solve the QCP more carefully (more iterations, better " *
-            "init, or curriculum) or pass min_nominal_fidelity=0 to skip."
+            "init, or curriculum) or pass min_nominal_fidelity=0 to skip.",
         )
     end
     verbose && @info "$path_label: nominal fidelity check passed" F_nom threshold
@@ -115,16 +116,17 @@ tuned result.
   (a no-op for `NominalModel`).
 - `result::Union{Nothing, TuningResult}`: populated by `solve!`
 """
-mutable struct PulseTuningProblem{S<:AbstractTuningStrategy, M<:AbstractDeviceModel} <: AbstractPulseTuningProblem
+mutable struct PulseTuningProblem{S<:AbstractTuningStrategy,M<:AbstractDeviceModel} <:
+               AbstractPulseTuningProblem
     qcp::QuantumControlProblem
     experiment::AbstractExperiment
     measurement_model::MeasurementModel
     R_tr::NamedTuple
-    Q_meas::Union{Float64, Vector{Float64}}
+    Q_meas::Union{Float64,Vector{Float64}}
     # Chassis/strategy split: the inner step and the predictive device model.
     strategy::S
     device_model::M
-    result::Union{Nothing, TuningResult}
+    result::Union{Nothing,TuningResult}
 end
 
 """
@@ -147,9 +149,9 @@ function PulseTuningProblem(
     experiment::AbstractExperiment,
     measurement_model::MeasurementModel;
     R_tr::NamedTuple = (;),
-    Q_meas::Union{Float64, Vector{Float64}} = 1.0,
-    strategy::Union{Nothing, AbstractTuningStrategy} = nothing,
-    device_model::Union{Nothing, AbstractDeviceModel} = nothing,
+    Q_meas::Union{Float64,Vector{Float64}} = 1.0,
+    strategy::Union{Nothing,AbstractTuningStrategy} = nothing,
+    device_model::Union{Nothing,AbstractDeviceModel} = nothing,
 )
     # Default strategy: a lightweight no-op placeholder. A tuning strategy is
     # provided by passing `strategy=`; the strategy carries its own config and
@@ -164,7 +166,14 @@ function PulseTuningProblem(
     end
 
     return PulseTuningProblem(
-        qcp, experiment, measurement_model, R_tr, Q_meas, strat, devmodel, nothing
+        qcp,
+        experiment,
+        measurement_model,
+        R_tr,
+        Q_meas,
+        strat,
+        devmodel,
+        nothing,
     )
 end
 
@@ -205,13 +214,12 @@ function Piccolo.solve!(
     line_search::Bool = true,
     verbose::Bool = true,
     γ::Float64 = 0.8,
-    max_rejections::Union{Nothing, Int} = nothing,
+    max_rejections::Union{Nothing,Int} = nothing,
     min_nominal_fidelity::Float64 = 0.8,
     polyak_avg::Int = 0,
 )
     # Sanity check: refuse to run on a poorly-converged nominal QCP.
-    _check_nominal_fidelity(ptp.qcp, min_nominal_fidelity;
-                            verbose, path_label="QILC")
+    _check_nominal_fidelity(ptp.qcp, min_nominal_fidelity; verbose, path_label = "QILC")
 
     qcp = ptp.qcp
     z_ref = qcp.prob.trajectory
@@ -238,15 +246,18 @@ function Piccolo.solve!(
     # at the end of solve!. Reduces variance of the final iterate vs picking
     # the literal final or "best-J" iterate, which can chase shot noise on
     # hardware. polyak_avg=0 disables (current behavior preserved).
-    polyak_data_acc   = polyak_avg > 0 ? zero(z_ref.data) : nothing
-    polyak_global_acc = polyak_avg > 0 && z_ref.global_dim > 0 ?
-                        zero(z_ref.global_data) : nothing
+    polyak_data_acc = polyak_avg > 0 ? zero(z_ref.data) : nothing
+    polyak_global_acc =
+        polyak_avg > 0 && z_ref.global_dim > 0 ? zero(z_ref.global_data) : nothing
     polyak_count = 0
 
-    for i in 1:max_iter
+    for i = 1:max_iter
         # Per-iter timing accumulator. Phases that don't run for an iter
         # stay at 0.0.
-        t_experiment = 0.0; t_sysid = 0.0; t_nlp = 0.0; t_armijo = 0.0
+        t_experiment = 0.0;
+        t_sysid = 0.0;
+        t_nlp = 0.0;
+        t_armijo = 0.0
         t_iter_start = time()
 
         # 1. Extract pulse from current trajectory and run experiment
@@ -262,9 +273,23 @@ function Piccolo.solve!(
 
         if J_exp ≤ tol
             t_total = time() - t_iter_start
-            push!(history, IterationRecord(y_exp, J_exp, 1.0, tr_scale, pulse,
-                (experiment = t_experiment, sysid = 0.0, nlp = 0.0,
-                 armijo = 0.0, total = t_total)))
+            push!(
+                history,
+                IterationRecord(
+                    y_exp,
+                    J_exp,
+                    1.0,
+                    tr_scale,
+                    pulse,
+                    (
+                        experiment = t_experiment,
+                        sysid = 0.0,
+                        nlp = 0.0,
+                        armijo = 0.0,
+                        total = t_total,
+                    ),
+                ),
+            )
             converged = true
             break
         end
@@ -274,8 +299,16 @@ function Piccolo.solve!(
         # candidate trajectory populated for acceptance; it stashes the
         # per-phase sysid/NLP timings for this iteration's IterationRecord.
         ctx = (;
-            pulse, y_exp, J_exp, z_ref, iter = i, tr_scale,
-            ipopt_options, verbose, qcp, y_goal,
+            pulse,
+            y_exp,
+            J_exp,
+            z_ref,
+            iter = i,
+            tr_scale,
+            ipopt_options,
+            verbose,
+            qcp,
+            y_goal,
             device_model = ptp.device_model,
         )
         pulse_cand = step(strategy, ctx)
@@ -296,9 +329,8 @@ function Piccolo.solve!(
         if line_search
             local α_value
             t_armijo = @elapsed begin
-                α_value, ls_evals = armijo_line_search(
-                    ptp.experiment, pulse, pulse_cand, y_goal, J_exp
-                )
+                α_value, ls_evals =
+                    armijo_line_search(ptp.experiment, pulse, pulse_cand, y_goal, J_exp)
             end
             α = α_value
             n_experiments += ls_evals
@@ -318,9 +350,8 @@ function Piccolo.solve!(
             # don't overwrite the owned value; a strategy that co-optimizes
             # globals with the controls reports `true`.
             if z_ref.global_dim > 0 && accepts_global_data(strategy)
-                z_ref.global_data .= (
-                    (1 - α) .* z_ref.global_data .+ α .* cand_traj.global_data
-                )
+                z_ref.global_data .=
+                    ((1 - α) .* z_ref.global_data .+ α .* cand_traj.global_data)
             end
             consecutive_rejections = 0
         elseif α > 0.0
@@ -331,10 +362,25 @@ function Piccolo.solve!(
             consecutive_rejections += 1
             if !isnothing(max_rejections) && consecutive_rejections > max_rejections
                 t_total = time() - t_iter_start
-                push!(history, IterationRecord(y_exp, J_exp, α, tr_scale, pulse,
-                    (experiment = t_experiment, sysid = t_sysid, nlp = t_nlp,
-                     armijo = t_armijo, total = t_total)))
-                verbose && @info "QILC: stopping after $consecutive_rejections consecutive rejections"
+                push!(
+                    history,
+                    IterationRecord(
+                        y_exp,
+                        J_exp,
+                        α,
+                        tr_scale,
+                        pulse,
+                        (
+                            experiment = t_experiment,
+                            sysid = t_sysid,
+                            nlp = t_nlp,
+                            armijo = t_armijo,
+                            total = t_total,
+                        ),
+                    ),
+                )
+                verbose &&
+                    @info "QILC: stopping after $consecutive_rejections consecutive rejections"
                 break
             end
         end
@@ -352,11 +398,26 @@ function Piccolo.solve!(
         end
 
         t_total = time() - t_iter_start
-        push!(history, IterationRecord(y_exp, J_exp, α, tr_scale, pulse,
-            (experiment = t_experiment, sysid = t_sysid, nlp = t_nlp,
-             armijo = t_armijo, total = t_total)))
+        push!(
+            history,
+            IterationRecord(
+                y_exp,
+                J_exp,
+                α,
+                tr_scale,
+                pulse,
+                (
+                    experiment = t_experiment,
+                    sysid = t_sysid,
+                    nlp = t_nlp,
+                    armijo = t_armijo,
+                    total = t_total,
+                ),
+            ),
+        )
 
-        verbose && @info "QILC iter $i timing (s)" experiment=t_experiment sysid=t_sysid nlp=t_nlp armijo=t_armijo total=t_total
+        verbose &&
+            @info "QILC iter $i timing (s)" experiment=t_experiment sysid=t_sysid nlp=t_nlp armijo=t_armijo total=t_total
 
         # Polyak-Ruppert averaging: accumulate the last polyak_avg iters'
         # trajectory data into a running mean. Skips iters that line search

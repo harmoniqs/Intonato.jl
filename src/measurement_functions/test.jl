@@ -13,7 +13,7 @@
     x0 = ket_to_iso(ψ0)
 
     # Parity at origin for vacuum: ⟨0|Π|0⟩ = 1
-    P0 = displaced_parity(x0, 0.0 + 0.0im; n_max=n_max)
+    P0 = displaced_parity(x0, 0.0 + 0.0im; n_max = n_max)
     @test P0 ≈ 1.0 atol = 1e-10
 
     # Displaced parity is related to Wigner: P(α) = (π/2) W(α)
@@ -29,7 +29,7 @@ end
     x = ket_to_iso(ψ)
 
     α = 0.3 + 0.2im
-    g = x -> displaced_parity(x, α; n_max=n_max)
+    g = x -> displaced_parity(x, α; n_max = n_max)
     grad = ForwardDiff.gradient(g, x)
     @test length(grad) == length(x)
     @test all(isfinite, grad)
@@ -100,9 +100,11 @@ end
     # Finite-difference check
     ε = 1e-7
     J_fd = zeros(2, 4)
-    for i in 1:4
-        x_p = copy(x); x_p[i] += ε
-        x_m = copy(x); x_m[i] -= ε
+    for i = 1:4
+        x_p = copy(x);
+        x_p[i] += ε
+        x_m = copy(x);
+        x_m[i] -= ε
         J_fd[:, i] = (populations(x_p) - populations(x_m)) / (2ε)
     end
     @test J ≈ J_fd atol = 1e-5
@@ -154,9 +156,11 @@ end
     # Finite-difference check
     ε = 1e-7
     J_fd = zeros(2, 4)
-    for i in 1:4
-        x_p = copy(ρ̃); x_p[i] += ε
-        x_m = copy(ρ̃); x_m[i] -= ε
+    for i = 1:4
+        x_p = copy(ρ̃);
+        x_p[i] += ε
+        x_m = copy(ρ̃);
+        x_m[i] -= ε
         J_fd[:, i] = (populations_density(x_p) - populations_density(x_m)) / (2ε)
     end
     @test J ≈ J_fd atol = 1e-5
@@ -176,12 +180,12 @@ end
     ρ_iso = density_to_iso_vec(ρ)
 
     # Wigner at origin should be 2/π for vacuum
-    W0 = wigner(ρ_iso, 0.0 + 0.0im; n_max=n_max)
+    W0 = wigner(ρ_iso, 0.0 + 0.0im; n_max = n_max)
     @test W0 ≈ 2 / π atol = 1e-10
 
     # Wigner should be positive everywhere for vacuum (Gaussian)
-    for r in 0.0:0.5:2.0
-        W = wigner(ρ_iso, r + 0.0im; n_max=n_max)
+    for r = 0.0:0.5:2.0
+        W = wigner(ρ_iso, r + 0.0im; n_max = n_max)
         @test W > -1e-10  # non-negative (up to numerics)
     end
 end
@@ -196,7 +200,7 @@ end
     ρ_iso = density_to_iso_vec(ρ)
 
     α = 0.5 + 0.3im
-    g = ρ_iso -> wigner(ρ_iso, α; n_max=n_max)
+    g = ρ_iso -> wigner(ρ_iso, α; n_max = n_max)
     grad = ForwardDiff.gradient(g, ρ_iso)
     @test length(grad) == length(ρ_iso)
     @test all(isfinite, grad)

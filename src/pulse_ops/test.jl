@@ -7,12 +7,13 @@
 @testitem "interpolate_pulse LinearSplinePulse" begin
     using Intonato
 
-    N = 11; T = 5.0
-    times = range(0.0, T, length=N) |> collect
+    N = 11;
+    T = 5.0
+    times = range(0.0, T, length = N) |> collect
     u1 = randn(1, N)
     u2 = randn(1, N)
-    p1 = LinearSplinePulse(u1, times; drive_name=:Ω)
-    p2 = LinearSplinePulse(u2, times; drive_name=:Ω)
+    p1 = LinearSplinePulse(u1, times; drive_name = :Ω)
+    p2 = LinearSplinePulse(u2, times; drive_name = :Ω)
 
     # α = 0 recovers p1
     p0 = interpolate_pulse(p1, p2, 0.0)
@@ -34,12 +35,13 @@ end
 @testitem "interpolate_pulse ZeroOrderPulse" begin
     using Intonato
 
-    N = 11; T = 5.0
-    times = range(0.0, T, length=N) |> collect
+    N = 11;
+    T = 5.0
+    times = range(0.0, T, length = N) |> collect
     u1 = randn(1, N)
     u2 = randn(1, N)
-    p1 = ZeroOrderPulse(u1, times; drive_name=:Ω)
-    p2 = ZeroOrderPulse(u2, times; drive_name=:Ω)
+    p1 = ZeroOrderPulse(u1, times; drive_name = :Ω)
+    p2 = ZeroOrderPulse(u2, times; drive_name = :Ω)
 
     # α = 0 recovers p1
     p0 = interpolate_pulse(p1, p2, 0.0)
@@ -61,14 +63,15 @@ end
 @testitem "interpolate_pulse CubicSplinePulse" begin
     using Intonato
 
-    N = 11; T = 5.0
-    times = range(0.0, T, length=N) |> collect
+    N = 11;
+    T = 5.0
+    times = range(0.0, T, length = N) |> collect
     u1 = randn(1, N)
     u2 = randn(1, N)
     du1 = randn(1, N)
     du2 = randn(1, N)
-    p1 = CubicSplinePulse(u1, du1, times; drive_name=:Ω)
-    p2 = CubicSplinePulse(u2, du2, times; drive_name=:Ω)
+    p1 = CubicSplinePulse(u1, du1, times; drive_name = :Ω)
+    p2 = CubicSplinePulse(u2, du2, times; drive_name = :Ω)
 
     # α = 0 recovers p1
     p0 = interpolate_pulse(p1, p2, 0.0)
@@ -97,10 +100,11 @@ end
 @testitem "truncate_pulse LinearSplinePulse at knot" begin
     using Intonato
 
-    N = 11; T = 5.0
-    times = range(0.0, T, length=N) |> collect
+    N = 11;
+    T = 5.0
+    times = range(0.0, T, length = N) |> collect
     u = randn(1, N)
-    pulse = LinearSplinePulse(u, times; drive_name=:Ω)
+    pulse = LinearSplinePulse(u, times; drive_name = :Ω)
 
     # Truncate at the 6th knot (index 6, time = times[6])
     t_end = times[6]
@@ -118,10 +122,11 @@ end
 @testitem "truncate_pulse LinearSplinePulse between knots" begin
     using Intonato
 
-    N = 11; T = 5.0
-    times = range(0.0, T, length=N) |> collect
+    N = 11;
+    T = 5.0
+    times = range(0.0, T, length = N) |> collect
     u = randn(1, N)
-    pulse = LinearSplinePulse(u, times; drive_name=:Ω)
+    pulse = LinearSplinePulse(u, times; drive_name = :Ω)
 
     # Truncate between knots 6 and 7
     t_end = (times[6] + times[7]) / 2.0
@@ -143,11 +148,12 @@ end
     using Intonato
     using ForwardDiff
 
-    N = 11; T = 5.0
-    times = range(0.0, T, length=N) |> collect
+    N = 11;
+    T = 5.0
+    times = range(0.0, T, length = N) |> collect
     u = randn(1, N)
     du = randn(1, N)
-    pulse = CubicSplinePulse(u, du, times; drive_name=:Ω)
+    pulse = CubicSplinePulse(u, du, times; drive_name = :Ω)
 
     # Truncate between knots 6 and 7
     t_end = (times[6] + times[7]) / 2.0
