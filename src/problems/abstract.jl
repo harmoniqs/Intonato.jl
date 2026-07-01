@@ -74,10 +74,9 @@ last_timings(::AbstractTuningStrategy) = (sysid = 0.0, nlp = 0.0)
     accepts_global_data(strategy) -> Bool
 
 Whether the chassis should also interpolate `z_ref.global_data` toward the
-candidate trajectory's globals on an accepted step. Default `false` — most
-strategies own their globals internally (e.g. ILC's alternating calibration
-writes calibrated θ directly into `z_ref`, so the candidate's phantom globals
-must NOT overwrite it).
+candidate trajectory's globals on an accepted step. Default `false` — a
+strategy that manages global parameters itself writes them directly into
+`z_ref`, so the candidate's phantom globals must NOT overwrite them.
 """
 accepts_global_data(::AbstractTuningStrategy) = false
 
