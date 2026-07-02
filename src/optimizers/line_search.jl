@@ -15,6 +15,11 @@ Tries α = 1.0, ρ, ρ², … until the experimental cost decreases, or α < α_
 # Keyword Arguments
 - `ρ::Float64`: backtracking factor (default: 0.5)
 - `α_min::Float64`: minimum step before rejecting (default: 0.01)
+- `cost::Union{Nothing,Function}`: trial-cost evaluator
+  `y_trial -> Float64`. Default (`nothing`) is the raw
+  `measurement_error(y_trial, y_goal)`. **Must produce the same units as
+  `J_ref`** — a whitened `J_ref` with a raw `cost` (or vice versa) silently
+  neuters the backtracking test. The chassis passes its whitened cost here.
 
 # Returns
 - `α::Float64`: accepted step size (0.0 if rejected)
@@ -28,14 +33,16 @@ function armijo_line_search(
     J_ref::Float64;
     ρ::Float64 = 0.5,
     α_min::Float64 = 0.01,
+    cost::Union{Nothing,Function} = nothing,
 )
+    costf = isnothing(cost) ? (y -> measurement_error(y, y_goal)) : cost
     α = 1.0
     n_evals = 0
 
     while α ≥ α_min
         pulse_trial = interpolate_pulse(pulse_ref, pulse_cand, α)
         y_trial = run_experiment(experiment, pulse_trial)
-        J_trial = measurement_error(y_trial, y_goal)
+        J_trial = costf(y_trial)
         n_evals += 1
 
         if J_trial < J_ref

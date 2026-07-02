@@ -6,6 +6,7 @@ using Reexport
 
 using LinearAlgebra
 using ForwardDiff   # used by measurement_functions/wigner.jl + pulse_ops/truncation.jl
+using Random: AbstractRNG   # SimulatedExperiment noise-sampling rng slot
 using TestItems
 
 # ──── Types ──────────────────────────────────────────────────────────────────
@@ -17,15 +18,25 @@ include("types/measurement_models.jl")
 include("types/experiment_record.jl")
 include("types/experiment_logger.jl")
 include("types/experiments.jl")
+include("types/experiments_noise_test.jl")
 include("types/hardware_backends.jl")
 include("types/test.jl")
+
+# ──── Noise statistics + whitening (GLS) ─────────────────────────────────────
+include("noise/noise_stats.jl")
+include("noise/noise_stats_test.jl")
+include("noise/whitening.jl")
+include("noise/whitening_test.jl")
 
 # ──── Measurement functions ──────────────────────────────────────────────────
 include("measurement_functions/state_measurements.jl")
 include("measurement_functions/wigner.jl")
 include("measurement_functions/displaced_parity.jl")
+include("measurement_functions/density_encoding.jl")
+include("measurement_functions/parity_reconstruction.jl")
 include("measurement_functions/partial_trace.jl")
 include("measurement_functions/test.jl")
+include("measurement_functions/bosonic_composite_test.jl")
 
 # ──── Pulse operations ───────────────────────────────────────────────────────
 include("pulse_ops/truncation.jl")
@@ -41,8 +52,12 @@ include("device_models/abstract.jl")
 
 # ──── Problems (the tuning chassis + strategy interface) ──────────────────────
 include("problems/abstract.jl")
+include("problems/acceptance.jl")
+include("problems/selectors.jl")
 include("problems/pulse_tuning_problem.jl")
 include("problems/test.jl")
+include("problems/acceptance_test.jl")
+include("problems/selectors_test.jl")
 
 # ──── Exports ────────────────────────────────────────────────────────────────
 
@@ -57,6 +72,9 @@ export AbstractHardwareBackend
 export ExperimentRecord
 export AbstractExperimentLogger, NullExperimentLogger, InMemoryExperimentLogger, record!
 
+# Noise statistics + whitening (GLS)
+export noise_floor, debiased_cost, cost_std, diff_std, whiten
+
 # Core interface
 export run_experiment, model_predict, measurement_error
 export phase_max_fidelity
@@ -67,6 +85,10 @@ export observable_expectation, observable_expectations, expect
 export wigner, wigner_at
 export displaced_parity, displaced_parity_at
 export partial_trace_B
+export qubit_sigma_z, qubit_sigma_z_at
+export rho_triangle, rho_to_measvec, measvec_to_rho, reduced_cavity_rho
+export rho_measurement_functions
+export reconstruct_rho_from_parity
 
 # Pulse operations
 export truncate_pulse, interpolate_pulse
@@ -88,5 +110,16 @@ export prepare_strategy,
 # Closed-loop tuning chassis. The chassis is strategy-generic; its
 # result/record types are public.
 export PulseTuningProblem, TuningResult, IterationRecord
+
+# Acceptance-policy seam (chassis-owned step acceptance + trust-scale schedule)
+export AcceptancePolicy, LineSearchAcceptance, OneShotAcceptance
+export decide, reset_acceptance!
+
+# Iterate-selector seam (end-of-run iterate policy)
+export IterateSelector, FinalIterate, NoiseCorrectedBestJ, TopKRemeasure, PolyakAverage
+export select_iterate!
+
+# Strategy diagnostic hook (recorded as IterationRecord.F_model)
+export last_f_model
 
 end
