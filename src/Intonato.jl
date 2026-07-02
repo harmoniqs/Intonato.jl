@@ -53,9 +53,11 @@ include("device_models/abstract.jl")
 # ──── Problems (the tuning chassis + strategy interface) ──────────────────────
 include("problems/abstract.jl")
 include("problems/acceptance.jl")
+include("problems/selectors.jl")
 include("problems/pulse_tuning_problem.jl")
 include("problems/test.jl")
 include("problems/acceptance_test.jl")
+include("problems/selectors_test.jl")
 
 # ──── Exports ────────────────────────────────────────────────────────────────
 
@@ -112,5 +114,12 @@ export PulseTuningProblem, TuningResult, IterationRecord
 # Acceptance-policy seam (chassis-owned step acceptance + trust-scale schedule)
 export AcceptancePolicy, LineSearchAcceptance, OneShotAcceptance
 export decide, reset_acceptance!
+
+# Iterate-selector seam (end-of-run iterate policy)
+export IterateSelector, FinalIterate, NoiseCorrectedBestJ, TopKRemeasure, PolyakAverage
+export select_iterate!
+
+# Strategy diagnostic hook (recorded as IterationRecord.F_model)
+export last_f_model
 
 end
