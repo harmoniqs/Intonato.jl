@@ -24,8 +24,11 @@ include("types/test.jl")
 include("measurement_functions/state_measurements.jl")
 include("measurement_functions/wigner.jl")
 include("measurement_functions/displaced_parity.jl")
+include("measurement_functions/density_encoding.jl")
+include("measurement_functions/parity_reconstruction.jl")
 include("measurement_functions/partial_trace.jl")
 include("measurement_functions/test.jl")
+include("measurement_functions/bosonic_composite_test.jl")
 
 # ──── Pulse operations ───────────────────────────────────────────────────────
 include("pulse_ops/truncation.jl")
@@ -67,6 +70,10 @@ export observable_expectation, observable_expectations, expect
 export wigner, wigner_at
 export displaced_parity, displaced_parity_at
 export partial_trace_B
+export qubit_sigma_z, qubit_sigma_z_at
+export rho_triangle, rho_to_measvec, measvec_to_rho, reduced_cavity_rho
+export rho_measurement_functions
+export reconstruct_rho_from_parity
 
 # Pulse operations
 export truncate_pulse, interpolate_pulse
