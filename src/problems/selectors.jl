@@ -133,7 +133,7 @@ function select_iterate!(s::TopKRemeasure, z_ref, history, ctx)
             isnothing(boost) ? run_experiment(ctx.experiment, rec.pulse) :
             run_experiment(ctx.experiment, rec.pulse; n_shots = boost)
         n_evals += 1
-        w, σ2 = whiten(model_boost, y_re)
+        w, σ2 = whiten(model_boost, y_re; W_task = get(ctx, :W_task, nothing))
         r = _flat_residual(ctx.y_goal, y_re)
         J̃ = debiased_cost(sum(abs2, w .* r), w, σ2)
         if J̃ < best_J

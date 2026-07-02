@@ -167,6 +167,11 @@ mutable struct PulseTuningProblem{S<:AbstractTuningStrategy,M<:AbstractDeviceMod
     selector::Union{Nothing,IterateSelector}
     # Explicit fixed goal (nothing ⇒ resolved once from tuning_goal in solve!).
     y_goal::Union{Nothing,Vector{Measurement}}
+    # Task-importance weights, flattened per element (nothing ⇒ all-ones).
+    # Composed multiplicatively with statistical whitening in every chassis
+    # cost: W = W_task·Σ^{-1/2} (e.g. the σ_z×40 leakage defense). Task
+    # importance is NOT noise statistics — both are first-class.
+    W_task::Union{Nothing,Vector{Float64}}
     result::Union{Nothing,TuningResult}
 end
 
@@ -196,6 +201,7 @@ function PulseTuningProblem(
     acceptance::Union{Nothing,AcceptancePolicy} = nothing,
     selector::Union{Nothing,IterateSelector} = nothing,
     y_goal::Union{Nothing,Vector{Measurement}} = nothing,
+    W_task::Union{Nothing,Vector{Float64}} = nothing,
 )
     # Default strategy: a lightweight no-op placeholder. A tuning strategy is
     # provided by passing `strategy=`; the strategy carries its own config and
@@ -220,6 +226,7 @@ function PulseTuningProblem(
         acceptance,
         selector,
         y_goal,
+        W_task,
         nothing,
     )
 end
@@ -323,12 +330,14 @@ function Piccolo.solve!(
     end
     reset_selector!(selector)
 
-    # The ACTIVE goal + measurement model. These start as the resolved fixed
-    # goal / declared model and are only ever RESTRICTED, mid-campaign, when
-    # the experiment starts returning fewer measurements (e.g. the lab σ_z
-    # fallback) — see the dimension-change guard in the loop.
+    # The ACTIVE goal + measurement model + task weights. These start as the
+    # resolved fixed goal / declared model / W_task and are only ever
+    # RESTRICTED, mid-campaign, when the experiment starts returning fewer
+    # measurements (e.g. the lab σ_z fallback) — see the dimension-change
+    # guard in the loop.
     y_goal_active = y_goal
     model_active = ptp.measurement_model
+    W_task_active = ptp.W_task
 
     for i = 1:max_iter
         # Per-iter timing accumulator. Phases that don't run for an iter
@@ -370,6 +379,10 @@ function Piccolo.solve!(
                 model_active.measurements[1:length(y_exp)],
                 model_active.indices[1:length(y_exp)],
             )
+            if !isnothing(W_task_active)
+                n_flat = sum(length(m.data) for m in y_exp)
+                W_task_active = W_task_active[1:n_flat]
+            end
             reset_acceptance!(policy)
         end
 
@@ -377,7 +390,7 @@ function Piccolo.solve!(
         # measurement model w ≡ 1 and σ² ≡ 0, so Ĵ equals the legacy raw SSR
         # and J̃ = Ĵ (behavior-preserving). Records and the convergence check
         # use the debiased J̃ — chassis, strategies, and logs speak one unit.
-        w, σ2 = whiten(model_active, y_exp)
+        w, σ2 = whiten(model_active, y_exp; W_task = W_task_active)
         r = _flat_residual(y_goal_active, y_exp)
         J_hat = sum(abs2, w .* r)
         J_exp = debiased_cost(J_hat, w, σ2)
@@ -433,6 +446,9 @@ function Piccolo.solve!(
             verbose,
             qcp,
             y_goal = y_goal_active,
+            measurement_model = model_active,
+            w,
+            σ2,
             device_model = ptp.device_model,
         )
         pulse_cand = step(strategy, ctx)
@@ -580,6 +596,7 @@ function Piccolo.solve!(
             experiment = ptp.experiment,
             measurement_model = model_active,
             y_goal = y_goal_active,
+            W_task = W_task_active,
             verbose,
         ),
     )
