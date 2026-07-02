@@ -72,12 +72,21 @@ function decide(p::LineSearchAcceptance, ctx)
         # No probing, full application, no schedule: R_tr holds verbatim.
         return (α = 1.0, accepted = true, revert = false, tr_scale = ctx.tr_scale, n_evals = 0)
     end
+    # Trial costs must be in the SAME units as J_ref = Ĵ (the whitened cost):
+    # plug-in GLS whitening at each trial's own y. With an all-deterministic
+    # model this reduces exactly to the raw measurement_error (w ≡ 1) — a raw
+    # trial cost against a whitened J_ref would silently neuter backtracking.
+    whitened_cost = y -> begin
+        w, _ = whiten(ctx.measurement_model, y)
+        sum(abs2, w .* _flat_residual(ctx.y_goal, y))
+    end
     α, n_evals = armijo_line_search(
         ctx.experiment,
         ctx.pulse,
         ctx.pulse_cand,
         ctx.y_goal,
-        ctx.J_hat,
+        ctx.J_hat;
+        cost = whitened_cost,
     )
     tr_scale = ctx.tr_scale * (α ≥ 0.5 ? p.γ : 1 / p.γ)
     return (α = α, accepted = α > 0, revert = false, tr_scale = tr_scale, n_evals = n_evals)

@@ -458,6 +458,7 @@ function Piccolo.solve!(
                     pulse,
                     pulse_cand,
                     y_goal = y_goal_active,
+                    measurement_model = model_active,
                     J_hat,
                     J_tilde = J_exp,
                     r,

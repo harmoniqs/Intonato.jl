@@ -135,6 +135,60 @@
     @test tC2.α == tC.α && tC2.tr == tC.tr && tC2.n_exp == tC.n_exp
 end
 
+@testitem "LineSearchAcceptance: armijo probes compare in whitened units" begin
+    using Intonato
+    using Intonato: AbstractTuningStrategy
+
+    # With a shot-noise measurement model the chassis J_ref is the WHITENED
+    # Ĵ. The armijo trial cost must be whitened the same way — a raw trial
+    # cost against a whitened J_ref silently accepts every α = 1 step (the
+    # trial cost is orders of magnitude below J_ref) and the campaign
+    # diverges. This pins the unit-consistency fix.
+    σx = ComplexF64[0 1; 1 0]
+    σz = ComplexF64[1 0; 0 -1]
+    sys_nom = QuantumSystem(0.01 * σz, [σx], [1.0])
+    sys_rabi = QuantumSystem(0.01 * σz, [1.15 * σx], [1.0])
+    N = 11
+    times = collect(range(0.0, 5.0, length = N))
+    pulse = LinearSplinePulse(0.1 * ones(1, N), times)
+    ψ_init = ComplexF64[1.0, 0.0]
+    ψ_goal = ComplexF64[0.0, 1.0]
+    model = MeasurementModel(
+        :ψ̃,
+        AbstractMeasurement[ShotNoiseMeasurement(populations, 400, population_covariance)],
+        [N],
+    )
+
+    mutable struct DampingStrategyW <: AbstractTuningStrategy
+        cand::Any
+    end
+    DampingStrategyW() = DampingStrategyW(nothing)
+    function Intonato.step(s::DampingStrategyW, ctx)
+        cand = deepcopy(ctx.z_ref)
+        cand.u .= 0.5 .* cand.u
+        s.cand = cand
+        return extract_pulse(ctx.qcp.qtraj, cand)
+    end
+    Intonato.candidate_trajectory(s::DampingStrategyW) = s.cand
+
+    qcp = SplinePulseProblem(
+        KetTrajectory(sys_nom, pulse, ψ_init, ψ_goal),
+        N;
+        Q = 100.0,
+        R = 1e-2,
+    )
+    experiment =
+        SimulatedExperiment(KetTrajectory(sys_rabi, pulse, ψ_init, ψ_goal), model)
+    ptp = PulseTuningProblem(qcp, experiment, model; strategy = DampingStrategyW())
+    solve!(ptp; max_iter = 4, verbose = false, min_nominal_fidelity = 0.0, tol = 0.0)
+
+    h = ptp.result.history
+    # Backtracking is live: a worsening candidate gets damped or rejected
+    # (mixed units accept α = 1 every iteration and J̃ blows up ~10×+).
+    @test any(rec.step_size < 1.0 for rec in h)
+    @test h[end].J_exp < 10 * max(h[1].J_exp, 1.0)
+end
+
 @testitem "OneShotAcceptance decide semantics (unit)" begin
     using Intonato
     using Intonato: decide, reset_acceptance!, cost_std, diff_std
