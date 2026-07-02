@@ -23,6 +23,8 @@ include("types/test.jl")
 # ──── Noise statistics + whitening (GLS) ─────────────────────────────────────
 include("noise/noise_stats.jl")
 include("noise/noise_stats_test.jl")
+include("noise/whitening.jl")
+include("noise/whitening_test.jl")
 
 # ──── Measurement functions ──────────────────────────────────────────────────
 include("measurement_functions/state_measurements.jl")
@@ -62,7 +64,7 @@ export ExperimentRecord
 export AbstractExperimentLogger, NullExperimentLogger, InMemoryExperimentLogger, record!
 
 # Noise statistics + whitening (GLS)
-export noise_floor, debiased_cost, cost_std, diff_std
+export noise_floor, debiased_cost, cost_std, diff_std, whiten
 
 # Core interface
 export run_experiment, model_predict, measurement_error
