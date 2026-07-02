@@ -6,6 +6,7 @@ using Reexport
 
 using LinearAlgebra
 using ForwardDiff   # used by measurement_functions/wigner.jl + pulse_ops/truncation.jl
+using Random: AbstractRNG   # SimulatedExperiment noise-sampling rng slot
 using TestItems
 
 # ──── Types ──────────────────────────────────────────────────────────────────
@@ -17,6 +18,7 @@ include("types/measurement_models.jl")
 include("types/experiment_record.jl")
 include("types/experiment_logger.jl")
 include("types/experiments.jl")
+include("types/experiments_noise_test.jl")
 include("types/hardware_backends.jl")
 include("types/test.jl")
 
