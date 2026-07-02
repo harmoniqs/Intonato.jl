@@ -110,6 +110,7 @@ export prepare_strategy,
 export PulseTuningProblem, TuningResult, IterationRecord
 
 # Acceptance-policy seam (chassis-owned step acceptance + trust-scale schedule)
-export AcceptancePolicy, LineSearchAcceptance, decide, reset_acceptance!
+export AcceptancePolicy, LineSearchAcceptance, OneShotAcceptance
+export decide, reset_acceptance!
 
 end
