@@ -114,6 +114,12 @@ tuned result.
   (`AbstractDeviceModel`). Defaults to a `NominalModel` wrapping the QCP's
   nominal system; `solve!` calls `adapt!(device_model, …)` each iteration
   (a no-op for `NominalModel`).
+- `y_goal::Union{Nothing, Vector{Measurement}}`: explicit goal measurements,
+  FIXED for the whole solve. `nothing` (default) → `solve!` resolves the goal
+  once at solve start from the strategy's `tuning_goal` hook (back-compat).
+  Supplied → used verbatim. Either way the resolved goal is computed **once**
+  and never recomputed mid-solve — recomputing it from the current command
+  makes the loop chase its own tail (the chained-loop-drift invariant).
 - `result::Union{Nothing, TuningResult}`: populated by `solve!`
 """
 mutable struct PulseTuningProblem{S<:AbstractTuningStrategy,M<:AbstractDeviceModel} <:
@@ -126,6 +132,8 @@ mutable struct PulseTuningProblem{S<:AbstractTuningStrategy,M<:AbstractDeviceMod
     # Chassis/strategy split: the inner step and the predictive device model.
     strategy::S
     device_model::M
+    # Explicit fixed goal (nothing ⇒ resolved once from tuning_goal in solve!).
+    y_goal::Union{Nothing,Vector{Measurement}}
     result::Union{Nothing,TuningResult}
 end
 
@@ -152,6 +160,7 @@ function PulseTuningProblem(
     Q_meas::Union{Float64,Vector{Float64}} = 1.0,
     strategy::Union{Nothing,AbstractTuningStrategy} = nothing,
     device_model::Union{Nothing,AbstractDeviceModel} = nothing,
+    y_goal::Union{Nothing,Vector{Measurement}} = nothing,
 )
     # Default strategy: a lightweight no-op placeholder. A tuning strategy is
     # provided by passing `strategy=`; the strategy carries its own config and
@@ -173,6 +182,7 @@ function PulseTuningProblem(
         Q_meas,
         strat,
         devmodel,
+        y_goal,
         nothing,
     )
 end
@@ -233,7 +243,10 @@ function Piccolo.solve!(
     # from `ptp`, `z_ref`, and the strategy's own config. For the default
     # `IdentityStrategy` this is a no-op and the loop leaves the pulse unchanged.
     strategy = prepare_strategy(ptp.strategy, ptp, z_ref; verbose)
-    y_goal = tuning_goal(strategy, ptp, z_ref)
+    # Resolve the goal measurements ONCE for the whole solve: the explicit
+    # y_goal kwarg verbatim if supplied, else the strategy's tuning_goal hook.
+    # Never recomputed mid-solve (the chained-loop-drift invariant).
+    y_goal = isnothing(ptp.y_goal) ? tuning_goal(strategy, ptp, z_ref) : ptp.y_goal
 
     history = IterationRecord[]
     tr_scale = 1.0
