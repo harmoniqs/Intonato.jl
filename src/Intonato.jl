@@ -52,8 +52,10 @@ include("device_models/abstract.jl")
 
 # ──── Problems (the tuning chassis + strategy interface) ──────────────────────
 include("problems/abstract.jl")
+include("problems/acceptance.jl")
 include("problems/pulse_tuning_problem.jl")
 include("problems/test.jl")
+include("problems/acceptance_test.jl")
 
 # ──── Exports ────────────────────────────────────────────────────────────────
 
@@ -106,5 +108,8 @@ export prepare_strategy,
 # Closed-loop tuning chassis. The chassis is strategy-generic; its
 # result/record types are public.
 export PulseTuningProblem, TuningResult, IterationRecord
+
+# Acceptance-policy seam (chassis-owned step acceptance + trust-scale schedule)
+export AcceptancePolicy, LineSearchAcceptance, decide, reset_acceptance!
 
 end

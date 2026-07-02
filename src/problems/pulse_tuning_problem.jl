@@ -51,6 +51,11 @@ end
 # trust-region representation, and any parameter calibration — lives behind the
 # strategy interface.
 
+# Flattened residual r = y_goal − y_exp in model element order (the vector the
+# whitened cost Ĵ = ‖W r‖² and the acceptance statistics are built from).
+_flat_residual(y_goal::Vector{Measurement}, y_exp::Vector{Measurement}) =
+    reduce(vcat, Vector{Float64}[g.data .- e.data for (g, e) in zip(y_goal, y_exp)])
+
 """
     _check_nominal_fidelity(qcp, threshold; verbose, path_label)
 
@@ -132,6 +137,9 @@ mutable struct PulseTuningProblem{S<:AbstractTuningStrategy,M<:AbstractDeviceMod
     # Chassis/strategy split: the inner step and the predictive device model.
     strategy::S
     device_model::M
+    # Acceptance policy (nothing ⇒ solve! builds a LineSearchAcceptance from
+    # its legacy γ / line_search kwargs).
+    acceptance::Union{Nothing,AcceptancePolicy}
     # Explicit fixed goal (nothing ⇒ resolved once from tuning_goal in solve!).
     y_goal::Union{Nothing,Vector{Measurement}}
     result::Union{Nothing,TuningResult}
@@ -160,6 +168,7 @@ function PulseTuningProblem(
     Q_meas::Union{Float64,Vector{Float64}} = 1.0,
     strategy::Union{Nothing,AbstractTuningStrategy} = nothing,
     device_model::Union{Nothing,AbstractDeviceModel} = nothing,
+    acceptance::Union{Nothing,AcceptancePolicy} = nothing,
     y_goal::Union{Nothing,Vector{Measurement}} = nothing,
 )
     # Default strategy: a lightweight no-op placeholder. A tuning strategy is
@@ -182,6 +191,7 @@ function PulseTuningProblem(
         Q_meas,
         strat,
         devmodel,
+        acceptance,
         y_goal,
         nothing,
     )
@@ -203,7 +213,9 @@ and recording, and delegates the inner step to `ptp.strategy`.
 - `max_iter::Int`: maximum outer iterations (default: 5)
 - `tol::Float64`: convergence tolerance on measurement error (default: 1e-3)
 - `ipopt_options::NamedTuple`: options forwarded to the inner solve (default: `(;)`)
-- `line_search::Bool`: enable Armijo backtracking (default: true)
+- `line_search::Bool`: enable Armijo backtracking (default: true). Together
+  with `γ` this configures the default `LineSearchAcceptance` policy; both are
+  ignored when the problem carries an explicit `acceptance` policy.
 - `verbose::Bool`: print iteration info (default: true)
 - `γ::Float64`: trust region schedule factor (default: 0.8)
 - `max_rejections::Union{Nothing, Int}`: max consecutive line search rejections
@@ -248,11 +260,26 @@ function Piccolo.solve!(
     # Never recomputed mid-solve (the chained-loop-drift invariant).
     y_goal = isnothing(ptp.y_goal) ? tuning_goal(strategy, ptp, z_ref) : ptp.y_goal
 
+    # Resolve the acceptance policy: an explicit `ptp.acceptance` wins; else
+    # the legacy γ / line_search kwargs configure a LineSearchAcceptance
+    # (line_search=false ⇒ full-step, schedule-free — historical behavior).
+    policy =
+        isnothing(ptp.acceptance) ? LineSearchAcceptance(; γ, line_search) :
+        ptp.acceptance
+    reset_acceptance!(policy)
+
     history = IterationRecord[]
     tr_scale = 1.0
     n_experiments = 0
     consecutive_rejections = 0
     converged = false
+
+    # Last-accepted-iterate snapshot, for reject-and-revert policies
+    # (OneShotAcceptance): on an accepted trial the measured iterate is
+    # snapshotted before the next candidate is applied on top; on a revert
+    # the chassis restores it and discards the candidate.
+    z_accepted_data = copy(z_ref.data)
+    z_accepted_global = z_ref.global_dim > 0 ? copy(z_ref.global_data) : nothing
 
     # Polyak-Ruppert averaging buffers — accumulate the last `polyak_avg` iters'
     # trajectory data + global data, then write the running average into z_ref
@@ -280,8 +307,14 @@ function Piccolo.solve!(
         end
         n_experiments += 1
 
-        # 2. Check convergence
-        J_exp = measurement_error(y_exp, y_goal)
+        # 2. Whitened cost statistics + convergence. With an all-deterministic
+        # measurement model w ≡ 1 and σ² ≡ 0, so Ĵ equals the legacy raw SSR
+        # and J̃ = Ĵ (behavior-preserving). Records and the convergence check
+        # use the debiased J̃ — chassis, strategies, and logs speak one unit.
+        w, σ2 = whiten(ptp.measurement_model, y_exp)
+        r = _flat_residual(y_goal, y_exp)
+        J_hat = sum(abs2, w .* r)
+        J_exp = debiased_cost(J_hat, w, σ2)
         verbose && @info "QILC iter $i" J_exp tr_scale
 
         if J_exp ≤ tol
@@ -338,23 +371,52 @@ function Piccolo.solve!(
         # (`nothing` for a no-op strategy like IdentityStrategy ⇒ no update).
         cand_traj = candidate_trajectory(strategy)
 
-        # 7. Line search (optional)
-        if line_search
-            local α_value
-            t_armijo = @elapsed begin
-                α_value, ls_evals =
-                    armijo_line_search(ptp.experiment, pulse, pulse_cand, y_goal, J_exp)
+        # 7. Acceptance decision (policy seam): applied fraction α, accept /
+        # revert, extra experiment evals, and the trust-scale evolution — all
+        # policy-owned (LineSearchAcceptance reproduces the historical Armijo
+        # + γ-schedule behavior verbatim).
+        local decision
+        t_armijo = @elapsed begin
+            decision = decide(
+                policy,
+                (;
+                    experiment = ptp.experiment,
+                    pulse,
+                    pulse_cand,
+                    y_goal,
+                    J_hat,
+                    J_tilde = J_exp,
+                    r,
+                    w,
+                    σ2,
+                    tr_scale,
+                    iter = i,
+                    verbose,
+                ),
+            )
+        end
+        α = decision.α
+        n_experiments += decision.n_evals
+
+        # 8. Apply the decision. A revert restores the last accepted iterate
+        # and discards the candidate (reject-and-revert policies); an accepted
+        # trial is snapshotted BEFORE the next candidate is applied on top.
+        if decision.revert
+            z_ref.data .= z_accepted_data
+            if !isnothing(z_accepted_global)
+                z_ref.global_data .= z_accepted_global
             end
-            α = α_value
-            n_experiments += ls_evals
-        else
-            α = 1.0
+        elseif decision.accepted
+            z_accepted_data .= z_ref.data
+            if !isnothing(z_accepted_global)
+                z_accepted_global .= z_ref.global_data
+            end
         end
 
-        # 8. Accept step — interpolate trajectory in-place. A no-op strategy
-        # (IdentityStrategy) returns no candidate trajectory, so there is
-        # nothing to interpolate and the pulse is left unchanged.
-        if α > 0.0 && !isnothing(cand_traj)
+        # Interpolate toward the candidate trajectory in-place. A no-op
+        # strategy (IdentityStrategy) returns no candidate trajectory, so
+        # there is nothing to interpolate and the pulse is left unchanged.
+        if !decision.revert && α > 0.0 && !isnothing(cand_traj)
             z_ref.data .= (1 - α) .* z_ref.data .+ α .* cand_traj.data
             # Whether to also accept the candidate's globals is strategy-owned.
             # A strategy that owns its globals internally (e.g. via a separate
@@ -366,10 +428,9 @@ function Piccolo.solve!(
                 z_ref.global_data .=
                     ((1 - α) .* z_ref.global_data .+ α .* cand_traj.global_data)
             end
-            consecutive_rejections = 0
-        elseif α > 0.0
-            # Accepted step but no candidate trajectory (no-op tuning) — count
-            # as a non-rejection so the rejection-based early stop isn't tripped.
+        end
+
+        if decision.accepted && α > 0.0
             consecutive_rejections = 0
         else
             consecutive_rejections += 1
@@ -398,17 +459,9 @@ function Piccolo.solve!(
             end
         end
 
-        # 9. Trust region schedule
-        # The schedule grows/shrinks `tr_scale` based on the line-search outcome
-        # (α). With `line_search=false`, α is hardcoded to 1.0, so the schedule
-        # would unconditionally shrink `R_tr_effective = R_tr · tr_scale` by γ
-        # every iteration — driving the trust region to ~0 and leaving the NLP
-        # effectively unregularized in `u`. That makes `line_search=false` unsafe
-        # at large mismatch. Skip the adaptive scaling when line search is off;
-        # the user's `R_tr` then holds verbatim across iterations.
-        if line_search
-            tr_scale *= (α ≥ 0.5 ? γ : 1 / γ)
-        end
+        # 9. Trust-region scalar evolution — policy-owned (γ schedule for
+        # LineSearchAcceptance; shrink-only halving for OneShotAcceptance).
+        tr_scale = decision.tr_scale
 
         t_total = time() - t_iter_start
         push!(
