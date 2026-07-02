@@ -126,6 +126,15 @@ Strategy-generic closed-loop pulse-tuning chassis. Wraps a
 trust-region representation, a tuning `strategy`, and a predictive
 `device_model`.
 
+!!! warning "Frame-consistency contract (construction time)"
+    The device model / nominal system and the experiment must share operator
+    structure (frame). A model Jacobian built in one frame against an
+    experiment operating in another (e.g. displaced-frame model vs
+    rotating-frame truth) has a null space that SILENTLY caps convergence —
+    no error is raised, the loop just stalls. Physical equivalence cannot be
+    asserted generically; when mixing frames, validate deliberately with a
+    cross-frame consistency rollout.
+
 After `solve!`, the QCP's trajectory and qtraj are updated in-place with the
 tuned result.
 
