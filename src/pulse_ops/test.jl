@@ -7,7 +7,7 @@
 @testitem "interpolate_pulse LinearSplinePulse" begin
     using Intonato
 
-    N = 11;
+    N = 11
     T = 5.0
     times = range(0.0, T, length = N) |> collect
     u1 = randn(1, N)
@@ -35,7 +35,7 @@ end
 @testitem "interpolate_pulse ZeroOrderPulse" begin
     using Intonato
 
-    N = 11;
+    N = 11
     T = 5.0
     times = range(0.0, T, length = N) |> collect
     u1 = randn(1, N)
@@ -63,7 +63,7 @@ end
 @testitem "interpolate_pulse CubicSplinePulse" begin
     using Intonato
 
-    N = 11;
+    N = 11
     T = 5.0
     times = range(0.0, T, length = N) |> collect
     u1 = randn(1, N)
@@ -100,7 +100,7 @@ end
 @testitem "truncate_pulse LinearSplinePulse at knot" begin
     using Intonato
 
-    N = 11;
+    N = 11
     T = 5.0
     times = range(0.0, T, length = N) |> collect
     u = randn(1, N)
@@ -122,7 +122,7 @@ end
 @testitem "truncate_pulse LinearSplinePulse between knots" begin
     using Intonato
 
-    N = 11;
+    N = 11
     T = 5.0
     times = range(0.0, T, length = N) |> collect
     u = randn(1, N)
@@ -148,7 +148,7 @@ end
     using Intonato
     using ForwardDiff
 
-    N = 11;
+    N = 11
     T = 5.0
     times = range(0.0, T, length = N) |> collect
     u = randn(1, N)

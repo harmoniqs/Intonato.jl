@@ -71,7 +71,7 @@ adapt!(m::NominalModel, ::AbstractPulse, ::Any) = m   # no-op via dispatch
     σz = ComplexF64[1 0; 0 -1]
     sys = QuantumSystem(1.0 * σz, [σx], [1.0])
 
-    N = 11;
+    N = 11
     T = 5.0
     times = range(0.0, T, length = N) |> collect
     ψ0 = ComplexF64[1.0, 0.0]

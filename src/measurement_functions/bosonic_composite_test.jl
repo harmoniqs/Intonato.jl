@@ -144,8 +144,8 @@ end
     ψ1[2] = 1.0
     x_iso = ket_to_iso(ψ1)
     alphas = vec([
-        re + im * imm for
-        re in range(-1.2, 1.2, length = 9), imm in range(-1.2, 1.2, length = 9)
+        re + im * imm for re in range(-1.2, 1.2, length = 9),
+        imm in range(-1.2, 1.2, length = 9)
     ])
     parities = [displaced_parity(x_iso, α; n_max = n_max) for α in alphas]
 

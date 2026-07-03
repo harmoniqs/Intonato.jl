@@ -58,9 +58,9 @@ end
 
     # Edge: y = ±1 → variance → 0
     Σ_edge = pauli_covariance([1.0, -1.0, 0.0], 100)
-    @test Σ_edge[1, 1] ≈ 0.0 atol=1e-15
-    @test Σ_edge[2, 2] ≈ 0.0 atol=1e-15
-    @test Σ_edge[3, 3] ≈ 1/100  # maximum variance at equator
+    @test Σ_edge[1, 1] ≈ 0.0 atol = 1e-15
+    @test Σ_edge[2, 2] ≈ 0.0 atol = 1e-15
+    @test Σ_edge[3, 3] ≈ 1 / 100  # maximum variance at equator
 end
 
 @testitem "population_covariance formula" begin
