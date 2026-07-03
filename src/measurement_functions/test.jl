@@ -101,9 +101,9 @@ end
     ε = 1e-7
     J_fd = zeros(2, 4)
     for i = 1:4
-        x_p = copy(x);
+        x_p = copy(x)
         x_p[i] += ε
-        x_m = copy(x);
+        x_m = copy(x)
         x_m[i] -= ε
         J_fd[:, i] = (populations(x_p) - populations(x_m)) / (2ε)
     end
@@ -157,9 +157,9 @@ end
     ε = 1e-7
     J_fd = zeros(2, 4)
     for i = 1:4
-        x_p = copy(ρ̃);
+        x_p = copy(ρ̃)
         x_p[i] += ε
-        x_m = copy(ρ̃);
+        x_m = copy(ρ̃)
         x_m[i] -= ε
         J_fd[:, i] = (populations_density(x_p) - populations_density(x_m)) / (2ε)
     end

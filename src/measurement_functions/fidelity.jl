@@ -94,9 +94,9 @@ phase_max_fidelity_at(ψ_goal::AbstractVector{<:Complex}; n_grid::Int = 128) =
     @test all(isfinite, grad)
     ε = 1e-6
     for j in eachindex(x0)
-        xp = copy(x0);
+        xp = copy(x0)
         xp[j] += ε
-        xm = copy(x0);
+        xm = copy(x0)
         xm[j] -= ε
         @test grad[j] ≈ (f(xp) - f(xm)) / (2ε) atol = 1e-6
     end

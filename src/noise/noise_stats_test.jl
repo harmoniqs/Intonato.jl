@@ -3,7 +3,7 @@
 @testitem "noise floor and J statistics" begin
     using Intonato: noise_floor, debiased_cost, cost_std
 
-    w = ones(3);
+    w = ones(3)
     σ2 = [0.1, 0.2, 0.0]            # third element deterministic
     @test noise_floor(w, σ2) ≈ 0.3               # tr(WΣWᵀ) = Σ wᵢ² σᵢ²
 

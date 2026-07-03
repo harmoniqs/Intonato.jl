@@ -350,9 +350,9 @@ function Piccolo.solve!(
     for i = 1:max_iter
         # Per-iter timing accumulator. Phases that don't run for an iter
         # stay at 0.0.
-        t_experiment = 0.0;
-        t_sysid = 0.0;
-        t_nlp = 0.0;
+        t_experiment = 0.0
+        t_sysid = 0.0
+        t_nlp = 0.0
         t_armijo = 0.0
         t_iter_start = time()
 
@@ -588,7 +588,8 @@ function Piccolo.solve!(
         record!(logger, rec)
 
         verbose &&
-            @info "QILC iter $i timing (s)" experiment=t_experiment sysid=t_sysid nlp=t_nlp armijo=t_armijo total=t_total
+            @info "QILC iter $i timing (s)" experiment = t_experiment sysid = t_sysid nlp =
+                t_nlp armijo = t_armijo total = t_total
 
         # Per-iteration selector hook (PolyakAverage accumulates post-step
         # iterates here).
