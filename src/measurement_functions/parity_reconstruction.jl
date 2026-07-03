@@ -37,7 +37,7 @@ function reconstruct_rho_from_parity(
     A = Matrix{Float64}(undef, length(alphas), nv)
     for (k, α) in enumerate(alphas)
         D = _displacement_operator(Complex(α), work_dim)
-        M = (D' * Π * D)[1:rfd, 1:rfd]         # Hermitian rfd×rfd block
+        M = (D'*Π*D)[1:rfd, 1:rfd]         # Hermitian rfd×rfd block
         i = 1
         for (m, n) in tri                       # Tr[ρM] in rho_to_measvec coords
             if m == n

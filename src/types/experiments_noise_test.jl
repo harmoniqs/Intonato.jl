@@ -61,7 +61,8 @@ end
 
     # Same seed ⇒ same randn sequence, and σ ∝ 1/√n, so the boosted-shots noise
     # realization is exactly the n=400 realization scaled by 1/√10.
-    y400 = run_experiment(SimulatedExperiment(qtraj, model; rng = MersenneTwister(7)), pulse)
+    y400 =
+        run_experiment(SimulatedExperiment(qtraj, model; rng = MersenneTwister(7)), pulse)
     y4000 = run_experiment(
         SimulatedExperiment(qtraj, model; rng = MersenneTwister(7)),
         pulse;

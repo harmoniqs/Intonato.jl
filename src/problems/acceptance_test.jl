@@ -177,8 +177,7 @@ end
         Q = 100.0,
         R = 1e-2,
     )
-    experiment =
-        SimulatedExperiment(KetTrajectory(sys_rabi, pulse, ψ_init, ψ_goal), model)
+    experiment = SimulatedExperiment(KetTrajectory(sys_rabi, pulse, ψ_init, ψ_goal), model)
     ptp = PulseTuningProblem(qcp, experiment, model; strategy = DampingStrategyW())
     solve!(ptp; max_iter = 4, verbose = false, min_nominal_fidelity = 0.0, tol = 0.0)
 
@@ -194,7 +193,14 @@ end
     using Intonato: decide, reset_acceptance!, cost_std, diff_std
 
     # Minimal ctx builder — OneShotAcceptance never touches the experiment.
-    mkctx(; J_hat, J_tilde = J_hat, r = Float64[], w = Float64[], σ2 = Float64[], tr = 1.0) = (;
+    mkctx(;
+        J_hat,
+        J_tilde = J_hat,
+        r = Float64[],
+        w = Float64[],
+        σ2 = Float64[],
+        tr = 1.0,
+    ) = (;
         experiment = nothing,
         pulse = nothing,
         pulse_cand = nothing,
@@ -242,10 +248,7 @@ end
     # Old raw-ratio: J_trial > ρ_rej·J_base (0.05 > 0.02) ⇒ would reject.
     @test J_trial > 2.0 * J_base
     # New: ΔJ = 0.04 is inside 3σ_Δ ⇒ tolerated.
-    σΔ = diff_std(
-        cost_std(r_trial, w4, σ2_4),
-        cost_std(r_base, w4, σ2_4),
-    )
+    σΔ = diff_std(cost_std(r_trial, w4, σ2_4), cost_std(r_base, w4, σ2_4))
     @test J_trial - J_base < 3σΔ
     d_tol = decide(q, mkctx(J_hat = J_trial, r = r_trial, w = w4, σ2 = σ2_4))
     @test d_tol.accepted && !d_tol.revert
@@ -320,8 +323,7 @@ end
         R = 1e-2,
     )
     u0 = copy(qcp.prob.trajectory.u)
-    experiment =
-        SimulatedExperiment(KetTrajectory(sys_rabi, pulse, ψ_init, ψ_goal), model)
+    experiment = SimulatedExperiment(KetTrajectory(sys_rabi, pulse, ψ_init, ψ_goal), model)
 
     ptp = PulseTuningProblem(
         qcp,

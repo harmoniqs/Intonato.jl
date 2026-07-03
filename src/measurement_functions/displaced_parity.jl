@@ -27,17 +27,19 @@ function displaced_parity(
     cavity_only = n_max !== nothing
     composite = Nq !== nothing || Nc !== nothing
     if cavity_only && composite
-        throw(ArgumentError(
-            "displaced_parity: give exactly one of `n_max` (cavity-only) or `(Nq, Nc)` (composite), not both",
-        ))
+        throw(
+            ArgumentError(
+                "displaced_parity: give exactly one of `n_max` (cavity-only) or `(Nq, Nc)` (composite), not both",
+            ),
+        )
     elseif !cavity_only && !composite
-        throw(ArgumentError(
-            "displaced_parity: give either `n_max` (cavity-only) or `(Nq, Nc)` (composite)",
-        ))
+        throw(
+            ArgumentError(
+                "displaced_parity: give either `n_max` (cavity-only) or `(Nq, Nc)` (composite)",
+            ),
+        )
     elseif composite && (Nq === nothing || Nc === nothing)
-        throw(ArgumentError(
-            "displaced_parity: composite space needs BOTH `Nq` and `Nc`",
-        ))
+        throw(ArgumentError("displaced_parity: composite space needs BOTH `Nq` and `Nc`"))
     end
 
     if cavity_only
@@ -131,7 +133,6 @@ end
 
 Create a closure g(x_iso) → [qubit_sigma_z(x_iso)] for MeasurementModel.
 """
-qubit_sigma_z_at(; Nq::Int, Nc::Int) =
-    x_iso -> [qubit_sigma_z(x_iso; Nq = Nq, Nc = Nc)]
+qubit_sigma_z_at(; Nq::Int, Nc::Int) = x_iso -> [qubit_sigma_z(x_iso; Nq = Nq, Nc = Nc)]
 
 # ──── Tests ──────────────────────────────────────────────────────────────────

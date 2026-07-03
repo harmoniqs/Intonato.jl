@@ -70,7 +70,13 @@ end
 function decide(p::LineSearchAcceptance, ctx)
     if !p.line_search
         # No probing, full application, no schedule: R_tr holds verbatim.
-        return (α = 1.0, accepted = true, revert = false, tr_scale = ctx.tr_scale, n_evals = 0)
+        return (
+            α = 1.0,
+            accepted = true,
+            revert = false,
+            tr_scale = ctx.tr_scale,
+            n_evals = 0,
+        )
     end
     # Trial costs must be in the SAME units as J_ref = Ĵ (the whitened cost):
     # plug-in GLS whitening at each trial's own y. With an all-deterministic
@@ -151,7 +157,13 @@ function decide(p::OneShotAcceptance, ctx)
         p.J_base = ctx.J_hat
         p.σ_base = σ_trial
         p.J̃_base = ctx.J_tilde
-        return (α = p.β, accepted = true, revert = false, tr_scale = ctx.tr_scale, n_evals = 0)
+        return (
+            α = p.β,
+            accepted = true,
+            revert = false,
+            tr_scale = ctx.tr_scale,
+            n_evals = 0,
+        )
     end
 
     σΔ = diff_std(σ_trial, p.σ_base)

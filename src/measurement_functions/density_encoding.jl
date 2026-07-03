@@ -69,7 +69,7 @@ the cavity along rows and ρ_cav = M·M′.
 """
 function reduced_cavity_rho(x_iso::AbstractVector; Nq::Int, Nc::Int, rfd::Int)
     M = reshape(iso_to_ket(x_iso), Nc, Nq)
-    return (M * M')[1:rfd, 1:rfd]
+    return (M*M')[1:rfd, 1:rfd]
 end
 
 """
@@ -90,16 +90,25 @@ function rho_measurement_functions(; Nq::Int, Nc::Int, rfd::Int)
     fns = Function[]
     for (m, n) in rho_triangle(rfd)
         if m == n
-            push!(fns, let m = m
-                x -> [real(reduced_cavity_rho(x; Nq = Nq, Nc = Nc, rfd = rfd)[m, m])]
-            end)
+            push!(
+                fns,
+                let m = m
+                    x -> [real(reduced_cavity_rho(x; Nq = Nq, Nc = Nc, rfd = rfd)[m, m])]
+                end,
+            )
         else
-            push!(fns, let m = m, n = n
-                x -> [real(reduced_cavity_rho(x; Nq = Nq, Nc = Nc, rfd = rfd)[m, n])]
-            end)
-            push!(fns, let m = m, n = n
-                x -> [imag(reduced_cavity_rho(x; Nq = Nq, Nc = Nc, rfd = rfd)[m, n])]
-            end)
+            push!(
+                fns,
+                let m = m, n = n
+                    x -> [real(reduced_cavity_rho(x; Nq = Nq, Nc = Nc, rfd = rfd)[m, n])]
+                end,
+            )
+            push!(
+                fns,
+                let m = m, n = n
+                    x -> [imag(reduced_cavity_rho(x; Nq = Nq, Nc = Nc, rfd = rfd)[m, n])]
+                end,
+            )
         end
     end
     return fns

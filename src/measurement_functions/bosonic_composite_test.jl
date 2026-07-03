@@ -43,8 +43,7 @@ end
     for α in (0.0 + 0.0im, 0.3 - 0.4im, -0.5 + 0.1im)
         P = displaced_parity(x, α; Nq = Nq, Nc = Nc)
         @test P ≈ exp(-2 * abs2(β + α)) rtol = 1e-6
-        @test displaced_parity(x, -α; Nq = Nq, Nc = Nc) ≈
-              exp(-2 * abs2(β - α)) rtol = 1e-6
+        @test displaced_parity(x, -α; Nq = Nq, Nc = Nc) ≈ exp(-2 * abs2(β - α)) rtol = 1e-6
     end
 end
 
@@ -58,8 +57,8 @@ end
     ψ ./= norm(ψ)
     x = ket_to_iso(ψ)
     for α in (0.2 + 0.5im, -0.4 - 0.1im)
-        @test displaced_parity(x, α; Nq = 1, Nc = Nc) ≈
-              displaced_parity(x, α; n_max = Nc) atol = 1e-12
+        @test displaced_parity(x, α; Nq = 1, Nc = Nc) ≈ displaced_parity(x, α; n_max = Nc) atol =
+            1e-12
     end
 end
 
@@ -144,8 +143,10 @@ end
     ψ1 = zeros(ComplexF64, n_max)
     ψ1[2] = 1.0
     x_iso = ket_to_iso(ψ1)
-    alphas = vec([re + im * imm for re in range(-1.2, 1.2, length = 9),
-                  imm in range(-1.2, 1.2, length = 9)])
+    alphas = vec([
+        re + im * imm for
+        re in range(-1.2, 1.2, length = 9), imm in range(-1.2, 1.2, length = 9)
+    ])
     parities = [displaced_parity(x_iso, α; n_max = n_max) for α in alphas]
 
     rfd = 5

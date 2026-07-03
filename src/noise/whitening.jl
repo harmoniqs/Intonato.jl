@@ -14,8 +14,7 @@ end
 _element_variances(m::KnownCovarianceMeasurement, ::AbstractVector, ::Real) =
     LinearAlgebra.diag(m.Σ)
 
-_element_variances(::DeterministicMeasurement, y::AbstractVector, ::Real) =
-    zeros(length(y))
+_element_variances(::DeterministicMeasurement, y::AbstractVector, ::Real) = zeros(length(y))
 
 """
     whiten(model::MeasurementModel, y_exp::Vector{Measurement};

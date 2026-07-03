@@ -308,8 +308,7 @@ function Piccolo.solve!(
     # the legacy γ / line_search kwargs configure a LineSearchAcceptance
     # (line_search=false ⇒ full-step, schedule-free — historical behavior).
     policy =
-        isnothing(ptp.acceptance) ? LineSearchAcceptance(; γ, line_search) :
-        ptp.acceptance
+        isnothing(ptp.acceptance) ? LineSearchAcceptance(; γ, line_search) : ptp.acceptance
     reset_acceptance!(policy)
 
     history = IterationRecord[]

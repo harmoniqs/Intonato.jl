@@ -64,8 +64,7 @@ end
     base_pulse = LinearSplinePulse(0.1 * ones(1, N), times)
     ψ0 = ComplexF64[1.0, 0.0]
     ψg = ComplexF64[0.0, 1.0]
-    qcp =
-        SplinePulseProblem(KetTrajectory(sys, base_pulse, ψ0, ψg), N; Q = 100.0, R = 1e-2)
+    qcp = SplinePulseProblem(KetTrajectory(sys, base_pulse, ψ0, ψg), N; Q = 100.0, R = 1e-2)
     z_ref = qcp.prob.trajectory
 
     # Declared model: one shot-noise measurement at n=400 → boost = 400·4.
@@ -159,7 +158,8 @@ end
             ptp_kwargs = merge(ptp_kwargs, (; selector = kwargs[:selector]))
         end
         ptp = PulseTuningProblem(qcp, experiment, model; ptp_kwargs...)
-        solve_kwargs = haskey(kwargs, :polyak_avg) ? (; polyak_avg = kwargs[:polyak_avg]) : (;)
+        solve_kwargs =
+            haskey(kwargs, :polyak_avg) ? (; polyak_avg = kwargs[:polyak_avg]) : (;)
         solve!(
             ptp;
             max_iter = 3,
