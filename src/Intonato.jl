@@ -35,6 +35,7 @@ include("measurement_functions/displaced_parity.jl")
 include("measurement_functions/density_encoding.jl")
 include("measurement_functions/parity_reconstruction.jl")
 include("measurement_functions/partial_trace.jl")
+include("measurement_functions/fidelity.jl")
 include("measurement_functions/test.jl")
 include("measurement_functions/bosonic_composite_test.jl")
 
@@ -88,6 +89,7 @@ export observable_expectation, observable_expectations, expect
 export wigner, wigner_at
 export displaced_parity, displaced_parity_at
 export partial_trace_B
+export goal_fidelity, goal_fidelity_at, phase_max_fidelity_at
 export qubit_sigma_z, qubit_sigma_z_at
 export rho_triangle, rho_to_measvec, measvec_to_rho, reduced_cavity_rho
 export rho_measurement_functions
