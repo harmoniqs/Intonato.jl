@@ -59,6 +59,9 @@ include("problems/test.jl")
 include("problems/acceptance_test.jl")
 include("problems/selectors_test.jl")
 
+# ──── Strategies (public concrete strategies for the chassis) ─────────────────
+include("strategies/low_rank_hessian_strategy.jl")
+
 # ──── Exports ────────────────────────────────────────────────────────────────
 
 # Types
@@ -121,5 +124,10 @@ export select_iterate!
 
 # Strategy diagnostic hook (recorded as IterationRecord.F_model)
 export last_f_model
+
+# Public concrete strategies: measured-gradient Newton in the low-rank
+# principal subspace of the model cost Hessian (Liu et al. 2026,
+# arXiv:2606.05060).
+export LowRankHessianStrategy
 
 end
