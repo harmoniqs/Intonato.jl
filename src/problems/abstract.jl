@@ -71,6 +71,16 @@ Per-phase wall-clock timings stashed by the strategy's most recent `step`
 last_timings(::AbstractTuningStrategy) = (sysid = 0.0, nlp = 0.0)
 
 """
+    last_f_model(strategy) -> Union{Nothing, Float64}
+
+Model-fidelity diagnostic stashed by the strategy's most recent `step`
+(e.g. the free-phase model fidelity a QP-ILC strategy computes per
+iteration). Recorded in `IterationRecord.F_model`; powers the
+`f_proxy_slack` regression warning. Default: `nothing` (no diagnostic).
+"""
+last_f_model(::AbstractTuningStrategy) = nothing
+
+"""
     accepts_global_data(strategy) -> Bool
 
 Whether the chassis should also interpolate `z_ref.global_data` toward the

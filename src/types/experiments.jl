@@ -10,35 +10,101 @@ Simulated experiment using a "true" (mismatched) quantum system.
 The `qtraj_template` carries the true system, initial state, and goal.
 `run_experiment` rolls out the given pulse through this system and evaluates
 the measurement model at the specified knot indices.
+
+# Noise sampling contract
+`rng` (constructor kwarg, default `nothing`) controls measurement-noise
+sampling:
+- `rng === nothing` → deterministic evaluation, exactly the legacy behavior.
+- an `AbstractRNG` → after evaluating each measurement, draw
+  `ε ~ N(0, Σ(y))` from the element's noise model and add it (Gaussian
+  approximation to shot statistics; variances floored as in [`whiten`](@ref)).
+  Deterministic elements get no noise. Seeding the rng gives reproducible
+  fixtures.
 """
 struct SimulatedExperiment{QT<:AbstractQuantumTrajectory} <: AbstractExperiment
     qtraj_template::QT
     measurement_model::MeasurementModel
+    rng::Union{Nothing,AbstractRNG}
+end
+
+function SimulatedExperiment(
+    qtraj_template::AbstractQuantumTrajectory,
+    measurement_model::MeasurementModel;
+    rng::Union{Nothing,AbstractRNG} = nothing,
+)
+    return SimulatedExperiment(qtraj_template, measurement_model, rng)
+end
+
+# Value-type copies of shot-noise measurements with a boosted shot count.
+# Non-shot measurements pass through unchanged. Used by the `n_shots` override
+# (e.g. TopKRemeasure re-measuring finalists at higher precision).
+_with_n_shots(m::ShotNoiseMeasurement, n::Int) =
+    ShotNoiseMeasurement(m.g, n, m.covariance_fn)
+_with_n_shots(m::AbstractMeasurement, ::Int) = m
+
+function _with_n_shots(model::MeasurementModel, n::Int)
+    return MeasurementModel(
+        model.state_name,
+        AbstractMeasurement[_with_n_shots(m, n) for m in model.measurements],
+        model.indices,
+    )
+end
+
+# Add ε ~ N(0, Σ(y)) to each noisy measurement element in-place (in the vector;
+# Measurement itself is immutable — replaced). Variances come from each
+# measurement's noise model at the evaluated y, floored as in `whiten`.
+# Deterministic elements draw nothing, so the rng stream is stable across
+# layout-identical runs (the n_shots-scaling contract depends on this).
+function _sample_measurement_noise!(
+    measurements::Vector{Measurement},
+    model::MeasurementModel,
+    rng::AbstractRNG,
+)
+    for (j, m) in enumerate(model.measurements)
+        σ2 = _element_variances(m, measurements[j].data, 0.05)
+        any(>(0.0), σ2) || continue
+        noisy = measurements[j].data .+ sqrt.(σ2) .* randn(rng, length(σ2))
+        measurements[j] = Measurement(noisy, measurements[j].index)
+    end
+    return measurements
 end
 
 """
-    run_experiment(exp::SimulatedExperiment, pulse::AbstractPulse; logger = NullExperimentLogger())
+    run_experiment(exp::SimulatedExperiment, pulse::AbstractPulse;
+                   logger = NullExperimentLogger(), n_shots = nothing)
 
 Rollout pulse through the true system and evaluate measurements at each knot index.
 
 The positional contract is unchanged — this returns a `Vector{Measurement}`.
 The additive `logger` keyword (default [`NullExperimentLogger`](@ref), a no-op)
 builds an [`ExperimentRecord`](@ref) from the run and calls `record!(logger, …)`.
+
+The additive `n_shots` keyword (default `nothing` = passthrough) rebuilds the
+model's `ShotNoiseMeasurement`s with the boosted shot count before evaluation —
+a value-type copy, never a mutation of `exp`. With a sampling `rng` set on the
+experiment, the injected noise then scales as `1/√n_shots`.
 """
 function run_experiment(
     exp::SimulatedExperiment,
     pulse::AbstractPulse;
     logger::AbstractExperimentLogger = NullExperimentLogger(),
+    n_shots::Union{Nothing,Int} = nothing,
 )
     qtraj = rollout(exp.qtraj_template, pulse)
     knot_times = get_knot_times(pulse)
-    model = exp.measurement_model
+    model =
+        isnothing(n_shots) ? exp.measurement_model :
+        _with_n_shots(exp.measurement_model, n_shots)
 
     measurements = Vector{Measurement}(undef, length(model.indices))
     for (j, k) in enumerate(model.indices)
         t_k = knot_times[k]
         x_k = _state_at_time(qtraj, t_k, model.state_name)
         measurements[j] = Measurement(model.measurements[j](x_k), k)
+    end
+
+    if !isnothing(exp.rng)
+        _sample_measurement_noise!(measurements, model, exp.rng)
     end
 
     _maybe_record!(logger, exp, pulse, model, measurements; device = "sim")
@@ -81,7 +147,8 @@ end
 HardwareExperiment(run::Function) = HardwareExperiment(run, nothing)
 
 """
-    run_experiment(exp::HardwareExperiment, pulse::AbstractPulse; logger = NullExperimentLogger())
+    run_experiment(exp::HardwareExperiment, pulse::AbstractPulse;
+                   logger = NullExperimentLogger(), n_shots = nothing)
 
 Execute the user-provided `run` closure on `pulse` and return its
 `Vector{Measurement}`. The additive `logger` keyword (default
@@ -89,13 +156,26 @@ Execute the user-provided `run` closure on `pulse` and return its
 and calls `record!(logger, …)`; the record's `measurement_model` is `exp`'s
 annotation if set, otherwise a trivial placeholder derived from the returned
 measurement indices.
+
+The additive `n_shots` keyword forwards to the `run` closure when it accepts
+an `n_shots` keyword; otherwise it is ignored with a one-time warning (the
+closure owns the hardware shot budget).
 """
 function run_experiment(
     exp::HardwareExperiment,
     pulse::AbstractPulse;
     logger::AbstractExperimentLogger = NullExperimentLogger(),
+    n_shots::Union{Nothing,Int} = nothing,
 )
-    measurements = exp.run(pulse)
+    measurements = if isnothing(n_shots)
+        exp.run(pulse)
+    elseif hasmethod(exp.run, Tuple{typeof(pulse)}, (:n_shots,))
+        exp.run(pulse; n_shots = n_shots)
+    else
+        @warn "HardwareExperiment run closure does not accept n_shots; override ignored" maxlog =
+            1
+        exp.run(pulse)
+    end
     if !(logger isa NullExperimentLogger)
         model =
             isnothing(exp.measurement_model) ?

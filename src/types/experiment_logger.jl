@@ -54,9 +54,14 @@ persistent vault/catalog-backed loggers land in a follow-on plan.
 """
 struct InMemoryExperimentLogger <: AbstractExperimentLogger
     records::Vector{ExperimentRecord}
+    # Chassis IterationRecords delivered via solve!'s logger seam (the type
+    # is defined later in the include order, so the vector is untyped here).
+    iteration_records::Vector{Any}
 end
 
-InMemoryExperimentLogger() = InMemoryExperimentLogger(ExperimentRecord[])
+InMemoryExperimentLogger() = InMemoryExperimentLogger(ExperimentRecord[], Any[])
+InMemoryExperimentLogger(records::Vector{ExperimentRecord}) =
+    InMemoryExperimentLogger(records, Any[])
 
 record!(lg::InMemoryExperimentLogger, r::ExperimentRecord) = push!(lg.records, r)
 
