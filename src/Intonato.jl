@@ -27,6 +27,8 @@ include("noise/noise_stats.jl")
 include("noise/noise_stats_test.jl")
 include("noise/whitening.jl")
 include("noise/whitening_test.jl")
+include("noise/propagated_covariance.jl")
+include("noise/propagated_covariance_test.jl")
 
 # ──── Measurement functions ──────────────────────────────────────────────────
 include("measurement_functions/state_measurements.jl")
@@ -78,6 +80,7 @@ export AbstractExperimentLogger, NullExperimentLogger, InMemoryExperimentLogger,
 
 # Noise statistics + whitening (GLS)
 export noise_floor, debiased_cost, cost_std, diff_std, whiten
+export propagated_covariance, whiten_block, mahalanobis
 
 # Core interface
 export run_experiment, model_predict, measurement_error
