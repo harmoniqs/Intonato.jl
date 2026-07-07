@@ -21,7 +21,9 @@ provenance-rich hardware data.
 ## Status
 
 Early-stage. The chassis, slot interfaces, device model, and data-collection
-seam are in place; concrete tuning strategies are under active development.
+seam are in place. Concrete production tuning strategies ship in
+**Intonatissimo**, Harmoniqs' premium closed-loop calibration package —
+[get in touch](mailto:contact@harmoniqs.co) about licensing.
 
 ## Installation
 
