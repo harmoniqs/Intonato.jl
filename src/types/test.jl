@@ -153,3 +153,47 @@ end
     # A genuine population mismatch can't be fixed by a phase: F < 1.
     @test phase_max_fidelity(ComplexF64[0.0, 1.0], ψ_goal) < 0.75
 end
+
+@testitem "AbstractHardwareBackend interface generics are extendable and compose" begin
+    using Intonato
+    # Extend the exported interface generics (the same pattern a real backend
+    # package uses: `import Intonato: ...` then define methods on its type).
+    import Intonato: upload_pulse!, trigger!, readout, sample_rate
+
+    mutable struct MockBackend <: AbstractHardwareBackend
+        rate::Float64
+        loaded::Union{Nothing,AbstractPulse}
+        triggered::Bool
+    end
+    MockBackend(rate) = MockBackend(rate, nothing, false)
+
+    upload_pulse!(b::MockBackend, pulse::AbstractPulse) = (b.loaded = pulse; nothing)
+    trigger!(b::MockBackend) = (b.triggered = true; nothing)
+    readout(b::MockBackend) = [0.25, 0.75]        # raw "populations"
+    sample_rate(b::MockBackend) = b.rate
+
+    N = 5
+    pulse = LinearSplinePulse(0.1 .* ones(1, N), collect(range(0.0, 1.0, length = N)))
+    b = MockBackend(20.0)
+
+    # The four generics dispatch onto the concrete backend.
+    @test sample_rate(b) == 20.0
+    @test upload_pulse!(b, pulse) === nothing
+    @test b.loaded === pulse
+    @test trigger!(b) === nothing
+    @test b.triggered
+    @test readout(b) == [0.25, 0.75]
+
+    # Documented composition: a backend-specific factory chains
+    # upload → trigger → readout → discriminate into Measurements, wrapped as a
+    # HardwareExperiment that round-trips through run_experiment.
+    run = p -> begin
+        upload_pulse!(b, p)
+        trigger!(b)
+        [Measurement(readout(b), N)]
+    end
+    ys = run_experiment(HardwareExperiment(run), pulse)
+    @test ys isa Vector{<:Measurement}
+    @test ys[1].data == [0.25, 0.75]
+    @test ys[1].index == N
+end

@@ -73,6 +73,7 @@ export AbstractMeasurement,
 export pauli_covariance, population_covariance, wigner_covariance
 export pauli, pop
 export AbstractHardwareBackend
+export upload_pulse!, trigger!, readout, sample_rate
 export ExperimentRecord
 export AbstractExperimentLogger, NullExperimentLogger, InMemoryExperimentLogger, record!
 
