@@ -53,6 +53,10 @@ include("device_models/abstract.jl")
 
 # ──── Problems (the tuning chassis + strategy interface) ──────────────────────
 include("problems/abstract.jl")
+# Learnable-parameter declaration (`Learn`) + the `learnables` strategy seam.
+# Included after abstract.jl (needs AbstractTuningStrategy) and before
+# pulse_tuning_problem.jl (whose constructor calls `_wire_learnables!`).
+include("problems/learnable.jl")
 include("problems/acceptance.jl")
 include("problems/selectors.jl")
 include("problems/pulse_tuning_problem.jl")
@@ -111,6 +115,11 @@ export AbstractDeviceModel, NominalModel, predict, adapt!
 export AbstractPulseTuningProblem, AbstractTuningStrategy, IdentityStrategy, step
 export prepare_strategy,
     tuning_goal, candidate_trajectory, last_timings, accepts_global_data
+
+# Learnable-parameter seam: declare a device parameter learnable once (`Learn`);
+# a strategy exposes its set through `learnables`, and the PulseTuningProblem
+# constructor validates the QCP against it.
+export Learn, learnables
 
 # Closed-loop tuning chassis. The chassis is strategy-generic; its
 # result/record types are public.

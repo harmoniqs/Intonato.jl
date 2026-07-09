@@ -198,6 +198,15 @@ to the strategy via the generic strategy interface. The `strategy` field default
 to the lightweight `IdentityStrategy` (no tuning). `device_model` defaults to a
 `NominalModel` wrapping the QCP's nominal system. Pass `strategy=`/`device_model=`
 to override.
+
+**Learnable-parameter validation.** If the strategy declares learnable
+parameters (via [`learnables`](@ref) — a `NamedTuple` of [`Learn`](@ref)
+values), the constructor validates the QCP against them: each name must be a
+system global, must be carried by a globals-aware integrator, and its declared
+bounds are checked against the QCP's installed global bounds (warn-only). This
+turns the previously-silent 4-site declaration mismatch into a construction-time
+error, before any device time is spent. Pass `verbose=false` to silence the
+bounds-consistency warnings.
 """
 function PulseTuningProblem(
     qcp::QuantumControlProblem,
@@ -211,11 +220,19 @@ function PulseTuningProblem(
     selector::Union{Nothing,IterateSelector} = nothing,
     y_goal::Union{Nothing,Vector{Measurement}} = nothing,
     W_task::Union{Nothing,Vector{Float64}} = nothing,
+    verbose::Bool = true,
 )
     # Default strategy: a lightweight no-op placeholder. A tuning strategy is
     # provided by passing `strategy=`; the strategy carries its own config and
     # `solve!` calls `prepare_strategy` to build per-solve state from it.
     strat = isnothing(strategy) ? IdentityStrategy() : strategy
+    # Validate the QCP against the strategy's declared learnable parameters
+    # (`learnables`) before anything else — this is the first point the QCP and
+    # strategy meet, and catching a missing global / non-globals-aware
+    # integrator / stale bounds here beats failing deep in the first `solve!`
+    # step (or, worse, silently learning nothing). No-op when the strategy
+    # learns nothing (the default).
+    _wire_learnables!(qcp, strat; verbose)
     # Default device model: a NominalModel wrapping the QCP's nominal system.
     # `adapt!` is a no-op for NominalModel.
     devmodel = if isnothing(device_model)
