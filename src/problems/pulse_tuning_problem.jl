@@ -142,8 +142,12 @@ tuned result.
 - `qcp::QuantumControlProblem`: the original (solved) optimization problem
 - `experiment::AbstractExperiment`: hardware or simulated experiment
 - `measurement_model::MeasurementModel`: measurement functions and knot indices
-- `R_tr::NamedTuple`: trust-region weights per component, e.g. `(u=1e-2,)`
-- `Q_meas::Union{Float64, Vector{Float64}}`: measurement-matching weight(s)
+- `R_tr::NamedTuple`: **DEPRECATED (removed in v0.4.0)** — stored but never
+  consumed by `solve!`. Trust-region weighting is owned by the tuning strategy;
+  set it there instead. Passing a non-default value emits a warning.
+- `Q_meas::Union{Float64, Vector{Float64}}`: **DEPRECATED (removed in v0.4.0)** —
+  stored but never consumed. Use `W_task` (task weights) or a
+  `MeasurementMatchingObjective` weight instead. Non-default values warn.
 - `strategy::S`: the inner tuning strategy (the chassis/strategy split). The
   strategy provides the inner step and owns its own configuration; the default
   `IdentityStrategy` does no tuning (the loop runs but leaves the pulse unchanged).
@@ -212,6 +216,20 @@ function PulseTuningProblem(
     y_goal::Union{Nothing,Vector{Measurement}} = nothing,
     W_task::Union{Nothing,Vector{Float64}} = nothing,
 )
+    # DEPRECATED (v0.3.0 → removed v0.4.0): R_tr / Q_meas are stored on the
+    # struct but never consumed by `solve!` (verified: read only in tests). The
+    # concepts they named live elsewhere — trust-region weighting on the tuning
+    # strategy, measurement weighting via `W_task` / `MeasurementMatchingObjective`.
+    # Warn on a non-default value so it is not silently ignored (the default path
+    # stays quiet). Fields are retained for one release for source compatibility.
+    if R_tr != (;)
+        @warn "`R_tr` is not consumed by PulseTuningProblem/solve! and will be " *
+              "removed in v0.4.0; set trust-region weighting on the tuning strategy instead."
+    end
+    if Q_meas != 1.0
+        @warn "`Q_meas` is not consumed by PulseTuningProblem/solve! and will be " *
+              "removed in v0.4.0; use `W_task` or a MeasurementMatchingObjective weight instead."
+    end
     # Default strategy: a lightweight no-op placeholder. A tuning strategy is
     # provided by passing `strategy=`; the strategy carries its own config and
     # `solve!` calls `prepare_strategy` to build per-solve state from it.

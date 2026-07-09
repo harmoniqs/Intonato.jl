@@ -28,11 +28,18 @@
     qtraj_true = KetTrajectory(sys_true, pulse, ψ_init, ψ_goal)
     experiment = SimulatedExperiment(qtraj_true, model)
 
-    ptp = PulseTuningProblem(qcp, experiment, model; R_tr = (u = 1e-2,))
+    # R_tr is DEPRECATED (removed in v0.4.0): stored for one-release source
+    # compatibility but never consumed by solve!, so a non-default value must warn.
+    ptp = @test_logs (:warn, r"R_tr.*not consumed") match_mode = :any PulseTuningProblem(
+        qcp,
+        experiment,
+        model;
+        R_tr = (u = 1e-2,),
+    )
 
     @test ptp.qcp === qcp
     @test ptp.experiment === experiment
-    @test ptp.R_tr == (u = 1e-2,)
+    @test ptp.R_tr == (u = 1e-2,)   # still stored this release (compat)
     @test ptp.Q_meas == 1.0
     @test isnothing(ptp.result)
     # Default strategy is the no-op IdentityStrategy until a concrete strategy
