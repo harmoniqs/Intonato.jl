@@ -1,6 +1,6 @@
 name = "Intonato"
 uuid = "4c8581c7-0eaf-45eb-b8fa-a3474c50779c"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Nguyen and contributors"]
 
 [deps]
