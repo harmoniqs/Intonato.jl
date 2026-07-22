@@ -64,6 +64,7 @@ include("problems/selectors_test.jl")
 
 # ──── Strategies (public concrete strategies for the chassis) ─────────────────
 include("strategies/low_rank_hessian_strategy.jl")
+include("strategies/error_channel_strategy.jl")
 
 # ──── Exports ────────────────────────────────────────────────────────────────
 
@@ -134,5 +135,10 @@ export last_f_model
 # principal subspace of the model cost Hessian (Liu et al. 2026,
 # arXiv:2606.05060).
 export LowRankHessianStrategy
+
+# Error-channel-informed complement of LowRankHessianStrategy: measured-gradient
+# damped-Newton confined to a physically labelled calibration subspace built by
+# conjugating enumerated error operators through the trajectory (Schuster 2026).
+export ErrorChannelStrategy, error_channel_directions
 
 end
