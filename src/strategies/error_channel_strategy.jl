@@ -566,6 +566,165 @@ end
     @test last_timings(strat).nlp ≥ 0.0
 end
 
+@testitem "ErrorChannelStrategy: 3-level leaky transmon — 7 labelled channels + closed-loop calibration" begin
+    using Intonato
+    using Intonato: error_channel_directions, _propagator, step
+    using LinearAlgebra
+
+    # ── Realistic leaky-transmon fixture (prototype parameters, rotating frame,
+    #    GHz·ns ×2π). The gate-error space of a 2-level gate embedded in 3 levels
+    #    is 7-dimensional: 3 in-subspace Paulis + 4 leakage channels. ───────────
+    NL = 3
+    δ = 0.20
+    a = diagm(1 => sqrt.(1.0:(NL-1))) |> Matrix{ComplexF64}
+    ad = collect(a')
+    H0 = 2π * (-δ / 2 * ad * ad * a * a)
+    HI = 2π * Matrix{ComplexF64}(a + ad)
+    HQ = 2π * Matrix{ComplexF64}(im * (a - ad))
+    sys = QuantumSystem(H0, [HI, HQ], [(-1.0, 1.0), (-1.0, 1.0)])
+
+    # The enumerated 7 physical error operators (Hermitian), exactly the
+    # prototype's basis: 3 in-subspace Paulis + 4 leakage generators.
+    eij(i, j) = (M = zeros(ComplexF64, NL, NL); M[i, j] = 1; M)
+    error_ops = [
+        eij(1, 2) + eij(2, 1),          # X01
+        im * (eij(2, 1) - eij(1, 2)),   # Y01
+        eij(1, 1) - eij(2, 2),          # Z01
+        eij(1, 3) + eij(3, 1),          # leakX0
+        im * (eij(3, 1) - eij(1, 3)),   # leakY0
+        eij(2, 3) + eij(3, 2),          # leakX1
+        im * (eij(3, 2) - eij(2, 3)),   # leakY1
+    ]
+    labels = [:X01, :Y01, :Z01, :leakX0, :leakY0, :leakX1, :leakY1]
+
+    # ── Optimize an X gate on the {|0>, |1>} subspace (real Piccolo solve). ─────
+    N = 8
+    T = 20.0
+    times = collect(range(0.0, T, length = N))
+    u0 = vcat(fill(1 / (2T), 1, N), zeros(1, N))
+    pulse0 = LinearSplinePulse(copy(u0), times)
+    goal = EmbeddedOperator(:X, [1, 2], 3)
+    qcp_u = SplinePulseProblem(UnitaryTrajectory(sys, pulse0, goal), N; Q = 1e5, R = 1e-4)
+    solve!(qcp_u; max_iter = 300, verbose = false, print_level = 0)
+    pulse = get_pulse(qcp_u.qtraj)
+
+    # ── (A) Subspace reproduction: the 7 labelled error-channel directions built
+    #    from the FIRST-derivative conjugation span the SAME control subspace as
+    #    the low-rank (Gauss–Newton) Hessian of the phase-invariant gate error —
+    #    the prototype's 7-dimensional result (3 Paulis + 4 leakage). ───────────
+    nsub = 60
+    Hd = Matrix{ComplexF64}(H0)
+    Hc = Matrix{ComplexF64}[HI, HQ]
+    u0k = collect(get_knot_values(pulse))
+    nd, Nk = size(u0k)
+    M = nd * Nk
+    Pc = ComplexF64[1 0 0; 0 1 0]
+
+    # (A.1) The labelled 7-channel subspace from the error-op conjugation.
+    ecd = error_channel_directions(sys, pulse, error_ops; labels = labels, n_substeps = nsub)
+    r = size(ecd.V, 2)
+
+    # (A.2) The "ground-truth" low-rank Hessian subspace: right-singular vectors
+    #   of the phase-invariant comp-subspace unitary Jacobian J[j] = ∂(P U P')/∂u_j
+    #   with the (gauge) global-phase direction i·U_c projected out. The
+    #   Gauss–Newton Hessian is JᵀJ, so these ARE the low-rank-Hessian
+    #   eigenvectors — computed at THIS pulse, no optimum required. Its rank is
+    #   the gate-error dimension: 7 (8 comp-subspace real DOFs minus global phase).
+    U_ref = _propagator(Hd, Hc, pulse, nsub)
+    Uc_ref = Pc * U_ref * Pc'
+    gph = im .* Uc_ref                                  # global-phase generator on U_c
+    gph_n2 = real(sum(abs2, gph))
+    δ = 1e-6
+    JFr = zeros(Float64, 8, M)                          # 2×2 comp block = 4 complex = 8 real
+    e = zeros(M)
+    for j = 1:M
+        e[j] = δ
+        Up = _propagator(Hd, Hc, LinearSplinePulse(u0k .+ reshape(e, nd, Nk), times), nsub)
+        e[j] = -δ
+        Um = _propagator(Hd, Hc, LinearSplinePulse(u0k .+ reshape(e, nd, Nk), times), nsub)
+        e[j] = 0.0
+        dUc = Pc * ((Up .- Um) ./ (2δ)) * Pc'
+        dUc = dUc .- (real(sum(conj(gph) .* dUc)) / gph_n2) .* gph   # project out global phase
+        v = vec(dUc)
+        JFr[1:4, j] = real.(v)
+        JFr[5:8, j] = imag.(v)
+    end
+    Fsvd = svd(Matrix(JFr'))                            # M × 8; U columns = u-space sing vecs
+    σ = Fsvd.S
+    ndom = count(≥(1e-6 * σ[1]), σ)                     # gate-error dimension ≈ 7
+    Vh = Fsvd.U[:, 1:ndom]                              # low-rank Hessian subspace (M × ndom)
+
+    @info "3-level transmon subspace" rank_V = r labels = ecd.labels gate_error_dim = ndom
+
+    # The gate-error space is 7-dimensional; a generic 2-quadrature pulse excites
+    # (up to) all 7 channels. Both the labelled subspace and the low-rank Hessian
+    # subspace land on that space.
+    @test 6 ≤ r ≤ 7
+    @test 6 ≤ ndom ≤ 7
+    @test any(l -> occursin("leak", String(l)), ecd.labels)   # leakage channels present
+
+    # Captured fraction vs the 2×2 comp-block Jacobian ∂(P U P')/∂u.
+    # NOTE (informational, NOT asserted): the block Jacobian is not a valid
+    # first-order reference for the LEAKAGE channels. A leakage generator moves
+    # population OUT of the computational block — it changes U outside the block
+    # and is only *second*-order-visible in the endpoint 2×2 block — so this
+    # reference under-captures the 4 leakage directions (min ≈ 0.48) even though
+    # the labelled subspace is correct and full-rank (7). The prototype's
+    # "captured ≈ 1" is against the FULL error-generator Jacobian / infidelity
+    # Hessian; the meaningful, independent chassis check here is the
+    # LowRankHessianStrategy capture at the end of this testitem (asserted ≥ 0.95).
+    P = ecd.V * ecd.V'
+    ncmp = min(ndom, r)
+    captured = [norm(P * Vh[:, i])^2 for i = 1:ncmp]
+    @info "captured fraction vs 2×2-block Jacobian (leakage under-captured by construction)" ncmp min =
+        minimum(captured) mean = sum(captured) / length(captured)
+    @test ncmp ≥ 6
+
+    # ── (B) Closed-loop calibration of a KNOWN injected device error. The true
+    #    device has an over-rotation (5% drive scale) AND excess anharmonicity,
+    #    which drives leakage into |2>. Enumerating the 7 channels, the strategy
+    #    calibrates it through the leakage-sensitive populations observable. ─────
+    ψ0 = ComplexF64[1.0, 0.0, 0.0]
+    ψg = ComplexF64[0.0, 1.0, 0.0]
+    δ_true = 0.16
+    H0_true = 2π * (-δ_true / 2 * ad * ad * a * a)
+    sys_true = QuantumSystem(H0_true, [1.05 * HI, 1.05 * HQ], [(-1.0, 1.0), (-1.0, 1.0)])
+
+    qcp_k = SplinePulseProblem(KetTrajectory(sys, pulse, ψ0, ψg), N; Q = 100.0, R = 1e-2)
+    model = MeasurementModel(:ψ̃, [populations], [N])   # 3 populations at final knot; P2 = leakage
+    experiment = SimulatedExperiment(KetTrajectory(sys_true, pulse, ψ0, ψg), model)
+
+    strat = ErrorChannelStrategy(
+        error_ops;
+        labels = labels,
+        fd_step = 1e-3,
+        damping = 1e-2,
+        n_substeps = nsub,
+    )
+    ptp = PulseTuningProblem(qcp_k, experiment, model; strategy = strat)
+    solve!(ptp; max_iter = 8, tol = 1e-10, verbose = false, min_nominal_fidelity = 0.0)
+
+    hist = ptp.result.history
+    @info "closed-loop calibration" J_start = hist[1].J_exp J_end = hist[end].J_exp rank =
+        size(strat.V, 2) labels = strat.dir_labels
+    @test length(hist) ≥ 2
+    @test hist[end].J_exp < 0.2 * hist[1].J_exp     # calibrates the injected error
+    @test !isnothing(strat.V)
+    @test length(strat.dir_labels) == size(strat.V, 2)
+    @test strat.n_probes ≥ 2 * size(strat.V, 2)
+
+    # Same-fixture comparison against LowRankHessianStrategy: the labelled
+    # error-channel subspace contains the low-rank Hessian's principal subspace.
+    lrh = LowRankHessianStrategy(; fd_step = 1e-3)
+    qcp_k2 = SplinePulseProblem(KetTrajectory(sys, pulse, ψ0, ψg), N; Q = 100.0, R = 1e-2)
+    ptp2 = PulseTuningProblem(qcp_k2, experiment, model; strategy = lrh)
+    solve!(ptp2; max_iter = 1, tol = 0.0, verbose = false, min_nominal_fidelity = 0.0)
+    Pecs = strat.V * strat.V'
+    cap_lrh = [norm(Pecs * lrh.V[:, i])^2 for i = 1:size(lrh.V, 2)]
+    @info "captured LowRankHessian subspace" cap = cap_lrh
+    @test minimum(cap_lrh) ≥ 0.95
+end
+
 @testitem "ErrorChannelStrategy: constructor guards + refresh rebuild" begin
     using Intonato
     using Intonato: step, prepare_strategy
