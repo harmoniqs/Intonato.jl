@@ -4,6 +4,32 @@
 abstract type AbstractPulseTuningProblem end
 
 """
+    TunableProblem
+
+The Piccolo problem types a [`PulseTuningProblem`](@ref) chassis can wrap, as a
+single alias so the bound tracks Piccolo across versions.
+
+Piccolo's typed-templates work introduces `AbstractQuantumControlProblem` as the
+supertype of both `QuantumControlProblem` and the problem *wrappers*
+(`AbstractProblemWrapper <: AbstractQuantumControlProblem`, which is what
+`SamplingProblem` becomes). Before that exists, `QuantumControlProblem` is the
+only problem type — `SamplingProblem` is a function returning one — so it is the
+correct bound on older Piccolo.
+
+Resolved once at load. A Piccolo upgrade invalidates Intonato's precompiled
+image, so the branch is re-evaluated rather than baked in permanently.
+
+Hardcoding either arm breaks one side: the concrete `QuantumControlProblem`
+rejects the wrapper once it lands, and `AbstractQuantumControlProblem` is not a
+name that can be written at all until then.
+"""
+const TunableProblem = if isdefined(Piccolo, :AbstractQuantumControlProblem)
+    Piccolo.AbstractQuantumControlProblem
+else
+    Piccolo.QuantumControlProblem
+end
+
+"""
     AbstractTuningStrategy
 
 The inner optimization step plugged into a `PulseTuningProblem` chassis.

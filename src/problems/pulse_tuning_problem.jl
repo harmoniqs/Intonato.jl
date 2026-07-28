@@ -139,7 +139,10 @@ After `solve!`, the QCP's trajectory and qtraj are updated in-place with the
 tuned result.
 
 # Fields
-- `qcp::QuantumControlProblem`: the original (solved) optimization problem
+- `qcp::P` where `P<:`[`TunableProblem`](@ref): the original (solved) optimization
+  problem. Parametrized rather than annotated with the alias directly so the field
+  stays concrete; the alias tracks Piccolo's problem hierarchy across versions and
+  admits the `SamplingProblem` wrapper once it exists.
 - `experiment::AbstractExperiment`: hardware or simulated experiment
 - `measurement_model::MeasurementModel`: measurement functions and knot indices
 - `R_tr::NamedTuple`: **DEPRECATED (removed in v0.4.0)** — stored but never
@@ -163,9 +166,12 @@ tuned result.
   makes the loop chase its own tail (the chained-loop-drift invariant).
 - `result::Union{Nothing, TuningResult}`: populated by `solve!`
 """
-mutable struct PulseTuningProblem{S<:AbstractTuningStrategy,M<:AbstractDeviceModel} <:
-               AbstractPulseTuningProblem
-    qcp::QuantumControlProblem
+mutable struct PulseTuningProblem{
+    S<:AbstractTuningStrategy,
+    M<:AbstractDeviceModel,
+    P<:TunableProblem,
+} <: AbstractPulseTuningProblem
+    qcp::P
     experiment::AbstractExperiment
     measurement_model::MeasurementModel
     R_tr::NamedTuple
@@ -194,11 +200,12 @@ end
 Construct a strategy-generic pulse tuning problem from a `QuantumControlProblem`.
 
 **Strategy + device model (chassis/strategy split).** The problem is
-parametrized as `PulseTuningProblem{S,M}` on its tuning `strategy` and
-`device_model`. The chassis is strategy-agnostic — it owns the experiment /
-convergence / line-search / trust-region-scalar / record loop and delegates the
-inner step (and everything inner-specific, including any parameter calibration)
-to the strategy via the generic strategy interface. The `strategy` field defaults
+parametrized as `PulseTuningProblem{S,M,P}` on its tuning `strategy`,
+`device_model`, and the wrapped problem `P` (see [`TunableProblem`](@ref)). The
+chassis is strategy-agnostic — it owns the experiment / convergence /
+line-search / trust-region-scalar / record loop and delegates the inner step
+(and everything inner-specific, including any parameter calibration) to the
+strategy via the generic strategy interface. The `strategy` field defaults
 to the lightweight `IdentityStrategy` (no tuning). `device_model` defaults to a
 `NominalModel` wrapping the QCP's nominal system. Pass `strategy=`/`device_model=`
 to override.
@@ -213,7 +220,7 @@ error, before any device time is spent. Pass `verbose=false` to silence the
 bounds-consistency warnings.
 """
 function PulseTuningProblem(
-    qcp::QuantumControlProblem,
+    qcp::TunableProblem,
     experiment::AbstractExperiment,
     measurement_model::MeasurementModel;
     R_tr::NamedTuple = (;),
