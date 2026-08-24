@@ -368,3 +368,96 @@ end
     # verbose=false silences everything.
     @test_logs _check_learn_bounds_consistency(mismatched, learn; verbose = false)
 end
+
+@testitem "_wire_learnables! validates a learning strategy against the QCP" begin
+    using Intonato
+    using Intonato: AbstractTuningStrategy, Learn, _wire_learnables!
+
+    # A strategy that declares one learnable global.
+    struct _LearningStrategy <: AbstractTuningStrategy end
+    Intonato.learnables(::_LearningStrategy) = (ω = Learn(1.0; bounds = (0.5, 2.0)),)
+
+    # Mock the QCP surface _wire_learnables! reads: qtraj→system globals,
+    # integrators with global_names, constraints with global bounds.
+    struct _MockSys
+        global_params::Dict{Symbol,Float64}
+    end
+    struct _MockQTraj
+        sys::Any
+    end
+    Intonato.get_system(q::_MockQTraj) = q.sys
+    struct _MockGlobalInteg2
+        global_names::Vector{Symbol}
+    end
+    struct _MockBoundsCon2
+        is_global::Bool
+        var_names::Symbol
+        bounds_values::Any
+    end
+    struct _MockQCP
+        qtraj::Any
+        prob::Any
+    end
+    struct _MockProb
+        integrators::Vector{Any}
+        constraints::Vector{Any}
+    end
+
+    # A decoy non-matching constraint FIRST (non-global), then the matching
+    # one: the loop must iterate past the decoy (exercising the loop's own
+    # end-line) before breaking on the match.
+    qcp = _MockQCP(
+        _MockQTraj(_MockSys(Dict(:ω => 1.0))),
+        _MockProb(
+            Any[_MockGlobalInteg2([:ω])],
+            Any[
+                _MockBoundsCon2(false, :other, (0.0, 1.0)),
+                _MockBoundsCon2(true, :ω, ([0.5], [2.0])),
+            ],
+        ),
+    )
+
+    # All checks pass → nothing, no mutation.
+    @test _wire_learnables!(qcp, _LearningStrategy(); verbose = false) === nothing
+    # verbose=true with a matching installed global bound: consistency branch runs clean
+    @test _wire_learnables!(qcp, _LearningStrategy(); verbose = true) === nothing
+
+    # _global_bounds_pair fall-through shapes (unit):
+    using Intonato: _global_bounds_pair
+    @test _global_bounds_pair(([0.5, 0.1], [2.0, 0.9])) === nothing   # multi-dim tuple
+    @test _global_bounds_pair([0.5, 0.9]) === nothing                 # 2-vector
+
+    # multi-dimensional bounds_values inside a constraint → _global_bounds_pair
+    # returns nothing → falls through to the drift-risk warning branch too.
+    struct _MockMultiDimCon
+        is_global::Bool
+        var_names::Symbol
+        bounds_values::Any
+    end
+    qcp_multidim = _MockQCP(
+        _MockQTraj(_MockSys(Dict(:ω => 1.0))),
+        _MockProb(
+            Any[_MockGlobalInteg2([:ω])],
+            Any[_MockMultiDimCon(true, :ω, ([0.5, 0.1], [2.0, 0.9]))],
+        ),
+    )
+    @test_logs (:warn, r"no global bounds constraint") match_mode = :any _wire_learnables!(
+        qcp_multidim,
+        _LearningStrategy();
+        verbose = true,
+    )
+
+    # verbose=true with NO bounds constraint installed → the drift-risk warning
+    qcp_nobounds = _MockQCP(
+        _MockQTraj(_MockSys(Dict(:ω => 1.0))),
+        _MockProb(Any[_MockGlobalInteg2([:ω])], Any[]),
+    )
+    @test_logs (:warn, r"no global bounds constraint") match_mode = :any _wire_learnables!(
+        qcp_nobounds,
+        _LearningStrategy();
+        verbose = true,
+    )
+
+    # Empty learnables short-circuits before touching the QCP (line 228-232).
+    @test _wire_learnables!(qcp, IdentityStrategy()) === nothing
+end
