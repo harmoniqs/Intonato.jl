@@ -166,7 +166,8 @@ end
     qcp = SplinePulseProblem(qtraj, N; Q = 100.0, R = 1e-2)
 
     # threshold ≤ 0 disables the gate outright
-    @test _check_nominal_fidelity(qcp, 0.0; verbose = false, path_label = "test") === nothing
+    @test _check_nominal_fidelity(qcp, 0.0; verbose = false, path_label = "test") ===
+          nothing
 
     # A qcp whose fidelity throws is skipped, not fatal (nothing → gate passes)
     struct _Unfaithful end
@@ -269,12 +270,7 @@ end
         R = 1e-2,
     )
     experiment = SimulatedExperiment(KetTrajectory(sys_rabi, pulse, ψ_init, ψ_goal), model)
-    ptp = PulseTuningProblem(
-        qcp,
-        experiment,
-        model;
-        strategy = ExplodingStrategy(),
-    )
+    ptp = PulseTuningProblem(qcp, experiment, model; strategy = ExplodingStrategy())
     solve!(
         ptp;
         max_iter = 10,
@@ -402,13 +398,7 @@ end
             strategy = OscillatingStrategy(),
             acceptance = OneShotAcceptance(β = 0.5),
         )
-        solve!(
-            ptp;
-            max_iter = 6,
-            verbose = false,
-            min_nominal_fidelity = 0.0,
-            tol = 0.0,
-        )
+        solve!(ptp; max_iter = 6, verbose = false, min_nominal_fidelity = 0.0, tol = 0.0)
         h = ptp.result.history
         @test length(h) == 6
         # Both acceptance outcomes occurred: the revert and accept branches of
