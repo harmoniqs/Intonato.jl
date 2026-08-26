@@ -350,3 +350,36 @@ end
     @test h[2].accepted
     @test h[2].tr_scale == h[1].tr_scale
 end
+
+@testitem "selectors: PolyakAverage and _restore_iterate with global data" begin
+    using Intonato
+    using Intonato: PolyakAverage, _restore_iterate!, observe!
+    using NamedTrajectories
+
+    # PolyakAverage global plumbing: a z_ref WITH a global component.
+    z_ref = NamedTrajectory(
+        (a = [1.0 2.0; 3.0 4.0], u = [0.5 0.6; 0.7 0.8], Δt = fill(0.1, 1, 2));
+        controls = (:u,),
+        timestep = :Δt,
+        global_data = [1.0, 2.0],
+        global_components = (g = 1:2,),
+    )
+    # observe! only accumulates inside the last-n window: i > max_iter - n.
+    p = PolyakAverage(5)
+    observe!(p, z_ref, (accepted = true,), 5, 10)   # window opens at i > 5
+    @test p.count == 0                              # not yet
+    observe!(p, z_ref, (accepted = true,), 6, 10)
+    @test p.count == 1
+    @test p.global_acc == [1.0, 2.0]
+    z_ref.global_data .= [10.0, 20.0]
+    observe!(p, z_ref, (accepted = true,), 7, 10)
+    @test p.global_acc == [11.0, 22.0]
+    select_iterate!(p, z_ref, nothing, (verbose = false,))
+    @test z_ref.global_data ≈ [5.5, 11.0]   # two-sample average
+
+    # _restore_iterate! with a global snapshot restores both data and globals
+    θ = (data = fill(9.0, size(z_ref.data)), global_data = [7.0, 8.0])
+    _restore_iterate!(z_ref, θ)
+    @test all(==(9.0), z_ref.data)
+    @test z_ref.global_data == [7.0, 8.0]
+end

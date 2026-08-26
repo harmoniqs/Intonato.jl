@@ -290,3 +290,47 @@ function phase_max_fidelity(ψ_T::AbstractVector, ψ_goal::AbstractVector; n_gri
     end
     return F_max
 end
+
+@testitem "HardwareExperiment run_experiment: logger, n_shots paths, pulse hash" begin
+    using Intonato
+    using Intonato:
+        HardwareExperiment,
+        InMemoryExperimentLogger,
+        _pulse_hash,
+        _placeholder_measurement_model
+    using Piccolo: LinearSplinePulse, CubicSplinePulse
+
+    times = collect(range(0.0, 1.0, length = 7))
+    pulse = LinearSplinePulse(0.05 .* ones(1, 7), times)
+    ms = [Measurement([0.5], 2), Measurement([0.6], 5)]
+
+    # 1. Plain run closure, logger on, no model → placeholder model + device="hardware"
+    lg = InMemoryExperimentLogger()
+    exp = HardwareExperiment(p -> ms)
+    got = run_experiment(exp, pulse; logger = lg)
+    @test got == ms
+    @test length(lg.records) == 1
+    @test lg.records[1].metadata.device == "hardware"
+    @test !isempty(lg.records[1].metadata.pulse_hash)
+
+    # 2. run closure accepting n_shots: forwarded
+    seen = Ref(0)
+    exp2 = HardwareExperiment(function (p; n_shots = nothing)
+        seen[] = something(n_shots, -1)
+        return ms
+    end)
+    run_experiment(exp2, pulse; logger = lg, n_shots = 32)
+    @test seen[] == 32
+
+    # 3. run closure NOT accepting n_shots: override ignored with a warning
+    exp3 = HardwareExperiment(p -> ms)
+    @test_logs (:warn, r"does not accept n_shots") match_mode = :any begin
+        run_experiment(exp3, pulse; logger = lg, n_shots = 10)
+    end
+
+    # 4. _pulse_hash distinguishes parameterizations: cubic knots hash derivatives too
+    cubic = CubicSplinePulse(0.05 .* ones(1, 7), zeros(1, 7), times)
+    @test _pulse_hash(cubic) != _pulse_hash(pulse)
+    cubic2 = CubicSplinePulse(0.05 .* ones(1, 7), 0.1 .* ones(1, 7), times)
+    @test _pulse_hash(cubic) != _pulse_hash(cubic2)
+end
