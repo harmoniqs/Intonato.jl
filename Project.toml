@@ -24,15 +24,15 @@ IntonatoOptimExt = "Optim"
 [compat]
 GenericSchur = "0.5.0 - 0.5.6"  # 0.5.7 piracy regression (RalphAS/GenericSchur.jl#24); drop when fixed
 ForwardDiff = "1.3"
-LinearAlgebra = "1.10, 1.11, 1.12"
+LinearAlgebra = "1.11"
 NamedTrajectories = "0.8, 0.9"
 Piccolo = "1.15, 2.0"
-Random = "1.10, 1.11, 1.12"
+Random = "1.11"
 Reexport = "1.2"
 SpecialFunctions = "2.7"
 TestItemRunner = "1.1"
 TestItems = "1.0"
-julia = "1.10, 1.11, 1.12"
+julia = "1.12"
 
 [extras]
 FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
