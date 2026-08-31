@@ -67,6 +67,16 @@ include("problems/selectors_test.jl")
 # ──── Strategies (public concrete strategies for the chassis) ─────────────────
 include("strategies/low_rank_hessian_strategy.jl")
 
+# ──── Hardware seam (Strumento ≥ 0.2: backend adapter + experiment factory) ───
+# The closed-loop hardware seam, relocated from Strumento.jl's v0.1.x tree when
+# its v0.2 standalone release severed the inverted dependency edge. The soc
+# substrate lives below this package; the backend adapter and the experiment
+# factory that bridge pulse → soc → measurement live here, at the chassis.
+include("hardware/strumento_backend.jl")
+include("hardware/strumento_experiment.jl")
+include("hardware/integration_test.jl")
+include("hardware/reexport_test.jl")
+
 # ──── Exports ────────────────────────────────────────────────────────────────
 
 # Types
