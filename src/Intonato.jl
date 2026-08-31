@@ -52,12 +52,28 @@ const duration = Piccolo.Quantum.Pulses.duration
 # names only, not the module itself). Used by the extension-aware soc reach below.
 import Strumento
 
+# ──── Extension-aware soc reach (Strumento ≥ 0.3) ─────────────────────────────
+# 0.3's extension split defines the concrete socs in package extensions, and on
+# Julia 1.12 extension exports NEVER surface on the parent module — `using
+# Strumento` cannot reach them. The Piccolo extension, however, is ALWAYS
+# attached when this package loads: Piccolo is a hard dependency here and is the
+# trigger that attaches StrumentoPiccoloExt, so the mock soc is bound once, at
+# module top level, straight from the attached extension (the empirically
+# verified reach mechanism; pinned in src/hardware/reexport_test.jl). The
+# delegation soc (StrumentoSoc, the PythonCall extension's type) is NOT reachable
+# from this package by design: this package's manifest carries no PythonCall, so
+# that extension never attaches — users who need it load PythonCall in their own
+# environment and reach the type through
+# `Base.get_extension(Strumento, :StrumentoPythonCallExt)`.
+const _StrumentoPiccoloExt = Base.get_extension(Strumento, :StrumentoPiccoloExt)
+const MockSoc = _StrumentoPiccoloExt.MockSoc
+export MockSoc
+
 # ──── Fresh-resolution hazard heal (Piccolo #323 / NamedTrajectories ≥ 0.9.3) ─
 # RETIRED at Strumento 0.3: the heal eval'd the defining-module `duration` binding
 # into Strumento's namespace, which under 0.3 has no Piccolo in scope (the extension
 # split) — the eval crashes at load. 0.3 binds its pulse-sampling seam from the
 # defining module itself (inside StrumentoPiccoloExt), so no heal is wanted.
-# The extension-aware soc reach (MockSoc) lives below the reexports.
 
 using LinearAlgebra
 using ForwardDiff   # used by measurement_functions/wigner.jl + pulse_ops/truncation.jl

@@ -55,16 +55,21 @@ end
     @test Measurement !== Strumento.Measurement
 
     # 3. The mock soc type is in the using-scope and is an AbstractSoc. Strumento
-    #    0.2 (the registered tarball) defines MockSoc in its base and exports it,
-    #    so the reexport exposes it directly; the extension-split move on
-    #    Strumento's unreleased main would put it behind Base.get_extension —
-    #    cover both so the item survives the substrate's next release.
+    #    0.3's extension split defines MockSoc in StrumentoPiccoloExt, and on
+    #    Julia 1.12 extension exports NEVER surface on the parent module — so
+    #    `using Strumento` alone cannot reach it. The verified mechanism (the
+    #    Strumento 0.3 load-configuration checks document these semantics): the
+    #    extension is attached because Piccolo — its trigger — is a hard dep of
+    #    this package, so src/Intonato.jl binds the type once, at top level, via
+    #    Base.get_extension, and re-exports it as Intonato's own binding.
+    @test isdefined(@__MODULE__, :MockSoc)
+    @test isdefined(Intonato, :MockSoc)
     @test MockSoc <: AbstractSoc
-    @test (
-        Base.get_extension(Strumento, :StrumentoPiccoloExt) === nothing ?
-        isdefined(Strumento, :MockSoc) :
-        isdefined(Base.get_extension(Strumento, :StrumentoPiccoloExt), :MockSoc)
-    )
+    ext = Base.get_extension(Strumento, :StrumentoPiccoloExt)
+    @test ext !== nothing
+    @test Intonato.MockSoc === ext.MockSoc
+    # The parent namespace stays clean: extension types never surface on it.
+    @test !isdefined(Strumento, :MockSoc)
 
     # 4. The `duration` bindings survive the NamedTrajectories ≥ 0.9.3 collision
     #    (Piccolo's top-level `duration` reexport is ambiguous against TimeWarp's;
