@@ -49,8 +49,7 @@ end
     # ── proportions (populations / counts): y = p ───────────────────────────
     m_pop = ShotNoiseMeasurement(x -> x, 400, population_covariance)
     p = [0.3, 0.7]
-    w_pop =
-        binomial_fisher_weights(MeasurementModel(:ψ̃, [m_pop], [1]), [Measurement(p, 1)])
+    w_pop = binomial_fisher_weights(MeasurementModel(:ψ̃, [m_pop], [1]), [Measurement(p, 1)])
     @test w_pop ≈ sqrt.(binomial_fisher_information.(p, 400))
     @test w_pop ≈ [sqrt(400 / (0.3 * 0.7)), sqrt(400 / (0.7 * 0.3))]
 
@@ -67,10 +66,8 @@ end
     # bundled presets — the A1 extensibility story.
     lab_cov = (y, n) -> Diagonal(y .* (1 .- y) ./ n)   # count statistics, y = p
     m_lab = ShotNoiseMeasurement(x -> x, 250, lab_cov)
-    w_lab = binomial_fisher_weights(
-        MeasurementModel(:ψ̃, [m_lab], [1]),
-        [Measurement([0.2], 1)],
-    )
+    w_lab =
+        binomial_fisher_weights(MeasurementModel(:ψ̃, [m_lab], [1]), [Measurement([0.2], 1)])
     @test w_lab[1] ≈ sqrt(binomial_fisher_information(0.2, 250))
 
     # ── mixed model: flattened element order (measurement-major), as whiten ─
