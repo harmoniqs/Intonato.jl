@@ -2,13 +2,9 @@
 # (its src/integration_test.jl @ 12a05b4) together with the seam. These validate
 # (1) the pulse→envelope→rollout translation is faithful (converges as the DAC rate
 # rises) and (2) the StrumentoExperiment composes with this package's
-# `PulseTuningProblem` chassis end-to-end.
-#
-# The mock soc type lives in Strumento's Piccolo extension; on Julia 1.12,
-# extension-defined types are reached via `Base.get_extension(Strumento,
-# :StrumentoPiccoloExt)`, never through the parent namespace (extension exports do
-# not surface on the parent module). This package depends on Piccolo, so the
-# extension loads automatically; only the type reachability changed in the move.
+# `PulseTuningProblem` chassis end-to-end. MockSoc (a top-level Strumento export in
+# the registered 0.2 tarball) arrives via the reexport; the reexport testitem
+# covers the extension-split reach for future substrate releases.
 #
 # NOTE: algorithmic *convergence* of QILC through the QICK seam needs a concrete
 # tuning strategy, which ships in a separate private package. The chassis test
@@ -17,9 +13,7 @@
 
 @testitem "QICK translation is faithful: readout converges as DAC rate rises" tags = [:slow] begin
     using Intonato
-    import Strumento
     using LinearAlgebra
-    MockSoc = Base.get_extension(Strumento, :StrumentoPiccoloExt).MockSoc
     σx = ComplexF64[0 1; 1 0]; σz = ComplexF64[1 0; 0 -1]
     sys = QuantumSystem(1.0 * σz, [σx], [1.0])
     N = 11
@@ -42,9 +36,13 @@ end
 
 @testitem "StrumentoExperiment composes with PulseTuningProblem (IdentityStrategy)" tags = [:slow] begin
     using Intonato
-    import Strumento
     using LinearAlgebra
-    MockSoc = Base.get_extension(Strumento, :StrumentoPiccoloExt).MockSoc
+    using Random
+    # Fixture discipline: seed the QCP init draw. The item's `randn` would
+    # otherwise depend on the global RNG state at its execution position in the
+    # suite (an unseeded draw occasionally stalls the nominal QCP below the
+    # chassis' min_nominal_fidelity gate — a flake, not a seam property).
+    Random.seed!(42)
     σx = ComplexF64[0 1; 1 0]; σz = ComplexF64[1 0; 0 -1]
     sys_nom = QuantumSystem(1.0 * σz, [σx], [1.0])
     sys_true = QuantumSystem(1.1 * σz, [σx], [1.0])   # model mismatch the "hardware" has

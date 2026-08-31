@@ -4,6 +4,60 @@ using Reexport
 @reexport using Piccolo
 @reexport using NamedTrajectories
 
+# ──── The soc substrate (Strumento ≥ 0.2) ─────────────────────────────────────
+# The convenience flip that came with the seam's relocation: `using Intonato` is
+# the one-stop import for the full stack — the loop chassis AND, through the new
+# dependency, the soc registry and its verbs (the substrate reexported the
+# chassis in Strumento ≤ 0.1; the chassis reexports the substrate now, matching
+# the dependency direction).
+#
+# NAME COLLISION — deliberate exclusion: both packages export `Measurement`.
+# This package's `Measurement` is the chassis type the hardware seam feeds, so
+# it governs; Strumento's (the substrate-owned duck-compatible twin returned by
+# `iq_to_measurements`) is deliberately NOT reexported — a blind
+# `@reexport using Strumento` would leave the name ambiguous in every
+# `using Intonato` scope. The seam converts at the factory
+# (src/hardware/strumento_experiment.jl) instead.
+#
+# The named list mirrors Strumento 0.2's registered export surface (compat pins
+# the exact minor): the soc contract + its verbs, the channel-map policy, the
+# translation verb + record, the readout conversion, and the two concrete socs
+# (top-level exports in 0.2 — the registered tarball predates the extension
+# split that carries them out of the parent namespace).
+@reexport using Strumento: AbstractSoc, MockSoc, StrumentoSoc, execute!,
+    load_envelope!, play_program!, acquire, dac_rate, adc_rate,
+    QickChannelMap, QickGenChannel, pulse_to_envelopes, QickProgram,
+    iq_to_measurements
+
+# NamedTrajectories ≥ 0.9.3 collides with Piccolo's top-level `duration` reexport
+# (TimeWarp's `duration` in the same reexport chain), which leaves `Piccolo.duration`
+# — and, through the reexports above, `Intonato.duration` — UNBOUND in fresh
+# resolutions while still listed among the exports. Pin the binding to its
+# defining module (the same binding StrumentoPiccoloExt uses) until Piccolo ships
+# its fix (harmoniqs/Piccolo.jl#323); the reexport-surface testitem pins it here.
+const duration = Piccolo.Quantum.Pulses.duration
+
+# The substrate's own module handle (the named reexport above binds its exported
+# names only, not the module itself). Used by the hazard heal in `__init__` below.
+import Strumento
+
+# ──── Fresh-resolution hazard heal (Piccolo #323 / NamedTrajectories ≥ 0.9.3) ─
+# Strumento 0.2.0 (the registered tarball) resolves `duration` through its wholesale
+# `@reexport using Piccolo`. With NamedTrajectories ≥ 0.9.3 in a fresh resolution,
+# `Piccolo.duration` is unbound (TimeWarp collision; harmoniqs/Piccolo.jl#323), so
+# `Strumento.duration` is unbound too, and the substrate's typed translation
+# (`pulse_to_envelopes` — the seam's `execute!` path) throws UndefVarError. Bind it
+# from its defining module, the same binding Strumento's in-flight extension uses.
+# Guarded: a no-op once the substrate self-heals (its extension split) or Piccolo
+# ships its fix. It must live in `__init__` — a top-level eval only runs at
+# precompile time, and this has to run in EVERY process that loads this package.
+function __init__()
+    if !isdefined(Strumento, :duration)
+        Core.eval(Strumento, :(const duration = Piccolo.Quantum.Pulses.duration))
+    end
+    return nothing
+end
+
 using LinearAlgebra
 using ForwardDiff   # used by measurement_functions/wigner.jl + pulse_ops/truncation.jl
 using Random: AbstractRNG   # SimulatedExperiment noise-sampling rng slot
@@ -88,6 +142,9 @@ export pauli_covariance, population_covariance, wigner_covariance
 export pauli, pop
 export AbstractHardwareBackend
 export upload_pulse!, trigger!, readout, sample_rate
+# The hardware seam (Strumento ≥ 0.2): the backend adapter over an AbstractSoc
+# and its experiment factory — relocated here from the substrate at its v0.2.
+export StrumentoBackend, StrumentoExperiment
 export ExperimentRecord
 export AbstractExperimentLogger, NullExperimentLogger, InMemoryExperimentLogger, record!
 

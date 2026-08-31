@@ -8,11 +8,38 @@
 # two record types are duck-compatible .data/.index twins) rather than re-typing
 # the chassis.
 
+"""
+    StrumentoExperiment(backend; measurement_model) → HardwareExperiment
+
+Build a `HardwareExperiment` whose `run(pulse)` uploads/plays `pulse` on
+`backend`'s SoC and discriminates the readout into measurements. The
+`measurement_model` annotates logged `ExperimentRecord`s with true provenance
+(rather than the identity placeholder); its indices must match `backend.indices`.
+Plug the result into `PulseTuningProblem(qcp, qexp, model; …)`.
+
+The substrate's `iq_to_measurements` returns the substrate-owned
+`Strumento.Measurement` (duck-compatible twin: `.data::Vector{Float64}`,
+`.index::Int`); the chassis here consumes THIS package's `Measurement`, so the
+`run` closure converts field-for-field at the seam — the chassis is not re-typed,
+and the two record types never mix in a `run_experiment` result.
+"""
+function StrumentoExperiment(backend::StrumentoBackend; measurement_model::MeasurementModel)
+    run = pulse -> begin
+        upload_pulse!(backend, pulse)
+        trigger!(backend)
+        raw = readout(backend)
+        # Convention flip (Strumento v0.2): substrate-owned record in, chassis
+        # record out — a trivial, duck-compatible conversion (documented above).
+        substrate_ms = iq_to_measurements(raw, backend.discriminator, backend.indices)
+        return Measurement[Measurement(m.data, m.index) for m in substrate_ms]
+    end
+    return HardwareExperiment(run, measurement_model)
+end
+
 @testitem "StrumentoExperiment produces valid, deterministic measurements" begin
     using Intonato
-    import Strumento
+    import Strumento   # Strumento.Measurement comparison below
     using LinearAlgebra
-    MockSoc = Base.get_extension(Strumento, :StrumentoPiccoloExt).MockSoc
     σx = ComplexF64[0 1; 1 0]; σz = ComplexF64[1 0; 0 -1]
     sys = QuantumSystem(1.0 * σz, [σx], [1.0])
     N = 11

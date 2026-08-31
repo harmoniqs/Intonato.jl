@@ -17,13 +17,62 @@
 # the StrumentoExperiment `run` closure (strumento_experiment.jl) does, once per
 # experiment evaluation.
 
+"""
+    StrumentoBackend(soc, channel_map, indices; discriminator = b -> real.(b))
+
+Hardware backend bridging a pulse to a soc (Strumento ≥ 0.2: `AbstractSoc` + its
+verbs). `indices` are the measurement knot indices (into `1:N`) the readout
+produces; `discriminator` maps one IQ blob to a data vector (default: real part,
+matching `MockSoc`'s populations forward model). `last_raw` holds the most recent
+raw readout.
+
+`channel_map` is the QICK device policy the **MockSoc** uses to route drives → gen
+channels; a **StrumentoSoc** ignores it (Python `strumento` owns routing via its
+own `Device`/wiring), so it may be an empty map there.
+
+Note: under line search the QILC chassis evaluates the experiment several times per
+outer iteration, so `last_raw` reflects the *last probe*, not necessarily the
+accepted iterate.
+"""
+mutable struct StrumentoBackend{S<:AbstractSoc} <: AbstractHardwareBackend
+    soc::S
+    channel_map::QickChannelMap
+    indices::Vector{Int}
+    discriminator::Function
+    _pulse::Union{Nothing,AbstractPulse}
+    last_raw::Any
+end
+
+StrumentoBackend(soc::AbstractSoc, channel_map::QickChannelMap, indices::Vector{Int};
+                 discriminator::Function = b -> real.(b)) =
+    StrumentoBackend(soc, channel_map, indices, discriminator, nothing, nothing)
+
+# The four verb extensions — home turf: the generics are declared by this package
+# (types/hardware_backends.jl), so these are plain method additions onto
+# Intonato's own function objects (the identity testitem below pins that).
+function upload_pulse!(b::StrumentoBackend, pulse::AbstractPulse)
+    b._pulse = pulse
+    return nothing
+end
+
+function trigger!(b::StrumentoBackend)
+    b._pulse === nothing && error("StrumentoBackend.trigger!: upload a pulse first")
+    # Each soc translates + runs the pulse its own way (Julia rollout for the mock,
+    # Python-strumento delegation for the real board).
+    b.last_raw = execute!(b.soc, b._pulse, b.channel_map, b.indices)
+    return nothing
+end
+
+readout(b::StrumentoBackend) = b.last_raw
+
+sample_rate(b::StrumentoBackend) = dac_rate(b.soc)
+
 @testitem "StrumentoBackend upload/trigger/readout against MockSoc" begin
     using Intonato
-    import Strumento  # module handle only: MockSoc is extension-defined
     using LinearAlgebra
-    # Extension-defined types never surface on the parent namespace (Julia 1.12):
-    # reach MockSoc through its canonical extension handle.
-    MockSoc = Base.get_extension(Strumento, :StrumentoPiccoloExt).MockSoc
+    # MockSoc arrives via the Strumento reexport (a top-level export in the
+    # registered 0.2 tarball; the reexport testitem covers the extension-split
+    # reach for future substrate releases).
     σx = ComplexF64[0 1; 1 0]; σz = ComplexF64[1 0; 0 -1]
     sys = QuantumSystem(1.0 * σz, [σx], [1.0])
     N = 11
