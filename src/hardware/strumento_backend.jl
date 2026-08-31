@@ -43,9 +43,12 @@ mutable struct StrumentoBackend{S<:AbstractSoc} <: AbstractHardwareBackend
     last_raw::Any
 end
 
-StrumentoBackend(soc::AbstractSoc, channel_map::QickChannelMap, indices::Vector{Int};
-                 discriminator::Function = b -> real.(b)) =
-    StrumentoBackend(soc, channel_map, indices, discriminator, nothing, nothing)
+StrumentoBackend(
+    soc::AbstractSoc,
+    channel_map::QickChannelMap,
+    indices::Vector{Int};
+    discriminator::Function = b -> real.(b),
+) = StrumentoBackend(soc, channel_map, indices, discriminator, nothing, nothing)
 
 # The four verb extensions — home turf: the generics are declared by this package
 # (types/hardware_backends.jl), so these are plain method additions onto
@@ -73,7 +76,8 @@ sample_rate(b::StrumentoBackend) = dac_rate(b.soc)
     # MockSoc arrives via the Strumento reexport (a top-level export in the
     # registered 0.2 tarball; the reexport testitem covers the extension-split
     # reach for future substrate releases).
-    σx = ComplexF64[0 1; 1 0]; σz = ComplexF64[1 0; 0 -1]
+    σx = ComplexF64[0 1; 1 0]
+    σz = ComplexF64[1 0; 0 -1]
     sys = QuantumSystem(1.0 * σz, [σx], [1.0])
     N = 11
     pulse = LinearSplinePulse(0.1 .* randn(1, N), collect(range(0.0, 5.0, length = N)))
@@ -105,7 +109,7 @@ end
         @test !isdefined(Strumento, f)            # … with no substrate-side twin.
     end
     # The relocated adapter's methods live on Intonato's own function objects.
-    @test hasmethod(Intonato.upload_pulse!, Tuple{StrumentoBackend, AbstractPulse})
+    @test hasmethod(Intonato.upload_pulse!, Tuple{StrumentoBackend,AbstractPulse})
     @test hasmethod(Intonato.trigger!, Tuple{StrumentoBackend})
     @test hasmethod(Intonato.readout, Tuple{StrumentoBackend})
     @test hasmethod(Intonato.sample_rate, Tuple{StrumentoBackend})

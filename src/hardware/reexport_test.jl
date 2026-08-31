@@ -10,9 +10,22 @@
     using Piccolo      # for the duration pin's defining-module path below
 
     # 1. The soc contract surface is in the using-scope (reexported from Strumento).
-    for f in (:AbstractSoc, :MockSoc, :StrumentoSoc, :execute!, :load_envelope!,
-        :play_program!, :acquire, :dac_rate, :adc_rate, :QickChannelMap,
-        :QickGenChannel, :pulse_to_envelopes, :QickProgram, :iq_to_measurements)
+    for f in (
+        :AbstractSoc,
+        :MockSoc,
+        :StrumentoSoc,
+        :execute!,
+        :load_envelope!,
+        :play_program!,
+        :acquire,
+        :dac_rate,
+        :adc_rate,
+        :QickChannelMap,
+        :QickGenChannel,
+        :pulse_to_envelopes,
+        :QickProgram,
+        :iq_to_measurements,
+    )
         @test isdefined(@__MODULE__, f)
         @test isdefined(Intonato, f)
     end
@@ -32,9 +45,11 @@
     #    Strumento's unreleased main would put it behind Base.get_extension —
     #    cover both so the item survives the substrate's next release.
     @test MockSoc <: AbstractSoc
-    @test (Base.get_extension(Strumento, :StrumentoPiccoloExt) === nothing
-           ? isdefined(Strumento, :MockSoc)
-           : isdefined(Base.get_extension(Strumento, :StrumentoPiccoloExt), :MockSoc))
+    @test (
+        Base.get_extension(Strumento, :StrumentoPiccoloExt) === nothing ?
+        isdefined(Strumento, :MockSoc) :
+        isdefined(Base.get_extension(Strumento, :StrumentoPiccoloExt), :MockSoc)
+    )
 
     # 4. The `duration` bindings survive the NamedTrajectories ≥ 0.9.3 collision
     #    (Piccolo's top-level `duration` reexport is ambiguous against TimeWarp's;

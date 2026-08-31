@@ -24,9 +24,20 @@ using Reexport
 # translation verb + record, the readout conversion, and the two concrete socs
 # (top-level exports in 0.2 — the registered tarball predates the extension
 # split that carries them out of the parent namespace).
-@reexport using Strumento: AbstractSoc, MockSoc, StrumentoSoc, execute!,
-    load_envelope!, play_program!, acquire, dac_rate, adc_rate,
-    QickChannelMap, QickGenChannel, pulse_to_envelopes, QickProgram,
+@reexport using Strumento:
+    AbstractSoc,
+    MockSoc,
+    StrumentoSoc,
+    execute!,
+    load_envelope!,
+    play_program!,
+    acquire,
+    dac_rate,
+    adc_rate,
+    QickChannelMap,
+    QickGenChannel,
+    pulse_to_envelopes,
+    QickProgram,
     iq_to_measurements
 
 # NamedTrajectories ≥ 0.9.3 collides with Piccolo's top-level `duration` reexport

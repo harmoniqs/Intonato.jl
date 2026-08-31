@@ -24,15 +24,17 @@ The substrate's `iq_to_measurements` returns the substrate-owned
 and the two record types never mix in a `run_experiment` result.
 """
 function StrumentoExperiment(backend::StrumentoBackend; measurement_model::MeasurementModel)
-    run = pulse -> begin
-        upload_pulse!(backend, pulse)
-        trigger!(backend)
-        raw = readout(backend)
-        # Convention flip (Strumento v0.2): substrate-owned record in, chassis
-        # record out — a trivial, duck-compatible conversion (documented above).
-        substrate_ms = iq_to_measurements(raw, backend.discriminator, backend.indices)
-        return Measurement[Measurement(m.data, m.index) for m in substrate_ms]
-    end
+    run =
+        pulse -> begin
+            upload_pulse!(backend, pulse)
+            trigger!(backend)
+            raw = readout(backend)
+            # Convention flip (Strumento v0.2): substrate-owned record in, chassis
+            # record out — a trivial, duck-compatible conversion (documented above).
+            substrate_ms =
+                iq_to_measurements(raw, backend.discriminator, backend.indices)
+            return Measurement[Measurement(m.data, m.index) for m in substrate_ms]
+        end
     return HardwareExperiment(run, measurement_model)
 end
 
@@ -40,7 +42,8 @@ end
     using Intonato
     import Strumento   # Strumento.Measurement comparison below
     using LinearAlgebra
-    σx = ComplexF64[0 1; 1 0]; σz = ComplexF64[1 0; 0 -1]
+    σx = ComplexF64[0 1; 1 0]
+    σz = ComplexF64[1 0; 0 -1]
     sys = QuantumSystem(1.0 * σz, [σx], [1.0])
     N = 11
     pulse = LinearSplinePulse(0.1 .* randn(1, N), collect(range(0.0, 5.0, length = N)))
