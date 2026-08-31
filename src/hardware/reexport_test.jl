@@ -1,5 +1,5 @@
 # The reexport-surface pin: `using Intonato` is the one-stop import for the full
-# convenience stack — the loop chassis AND, through the Strumento ≥ 0.2 dependency,
+# convenience stack — the loop chassis AND, through the Strumento ≥ 0.3 dependency,
 # the soc substrate and its verbs (the convenience flip that came with the seam's
 # relocation: the substrate reexported the chassis in Strumento ≤ 0.1; the chassis
 # reexports the substrate now, matching the dependency direction).
@@ -24,11 +24,12 @@ end
     import Strumento   # module handle only: no export surface brought in
     using Piccolo      # for the duration pin's defining-module path below
 
-    # 1. The soc contract surface is in the using-scope (reexported from Strumento).
+    # 1. The soc contract surface is in the using-scope (reexported from
+    #    Strumento 0.3's BASE exports — the extension-split parent namespace
+    #    carries exactly these names; the two concrete socs are covered in
+    #    sections 3 and 3b below).
     for f in (
         :AbstractSoc,
-        :MockSoc,
-        :StrumentoSoc,
         :execute!,
         :load_envelope!,
         :play_program!,
@@ -71,15 +72,31 @@ end
     # The parent namespace stays clean: extension types never surface on it.
     @test !isdefined(Strumento, :MockSoc)
 
-    # 4. The `duration` bindings survive the NamedTrajectories ≥ 0.9.3 collision
-    #    (Piccolo's top-level `duration` reexport is ambiguous against TimeWarp's;
-    #    harmoniqs/Piccolo.jl#323 tracks the upstream fix): pinned to its defining
-    #    module — in this package's own namespace and, via the __init__ heal in
-    #    src/Intonato.jl, in the substrate's (whose typed translation resolves
-    #    `duration` through Piccolo reexports and is otherwise unbound in fresh
-    #    resolutions).
+    # 3b. The delegation soc (StrumentoSoc) is NOT reachable from this package
+    #     under 0.3 — by design, not omission: it lives in the PythonCall
+    #     extension, this package's manifest carries no PythonCall, so that
+    #     extension never attaches. The documented reach for users who need the
+    #     real board: load PythonCall in their own environment, then
+    #     `Base.get_extension(Strumento, :StrumentoPythonCallExt).StrumentoSoc`.
+    @test !isdefined(Intonato, :StrumentoSoc)
+    @test !isdefined(@__MODULE__, :StrumentoSoc)
+    @test Base.get_extension(Strumento, :StrumentoPythonCallExt) === nothing
+
+    # 4. The `duration` seam at Strumento 0.3 — RE-POINTED off the retired
+    #    __init__ heal (src/Intonato.jl): the substrate now binds its
+    #    pulse-sampling seam from the DEFINING module inside StrumentoPiccoloExt,
+    #    so it needs no `Strumento.duration` binding at all. The heal-retirement
+    #    pin: if the eval were ever reintroduced (or lingered invisibly), the
+    #    first assertion below fails.
+    @test !isdefined(Strumento, :duration)
+    @test hasmethod(Strumento.pulse_duration, Tuple{Piccolo.AbstractPulse})
+    # This package's OWN `duration` pin (src/Intonato.jl) is KEPT, not retired:
+    # Piccolo's top-level reexport is still ambiguous against TimeWarp's
+    # (NamedTrajectories ≥ 0.9.3; Piccolo #323 — `Piccolo.duration` is unbound
+    # in fresh resolutions today), and this package reexports Piccolo's export
+    # list, so the defining-module binding is what makes `Intonato.duration`
+    # resolvable at all. Once Piccolo ships its fix the pin degrades to harmless
+    # shadowing; the invariant below holds in both worlds.
     @test isdefined(Intonato, :duration)
     @test Intonato.duration === Piccolo.Quantum.Pulses.duration
-    @test isdefined(Strumento, :duration)
-    @test Strumento.duration === Piccolo.Quantum.Pulses.duration
 end

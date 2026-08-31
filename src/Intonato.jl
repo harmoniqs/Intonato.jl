@@ -4,7 +4,7 @@ using Reexport
 @reexport using Piccolo
 @reexport using NamedTrajectories
 
-# ──── The soc substrate (Strumento ≥ 0.2) ─────────────────────────────────────
+# ──── The soc substrate (Strumento ≥ 0.3) ─────────────────────────────────────
 # The convenience flip that came with the seam's relocation: `using Intonato` is
 # the one-stop import for the full stack — the loop chassis AND, through the new
 # dependency, the soc registry and its verbs (the substrate reexported the
@@ -138,7 +138,7 @@ include("problems/selectors_test.jl")
 # ──── Strategies (public concrete strategies for the chassis) ─────────────────
 include("strategies/low_rank_hessian_strategy.jl")
 
-# ──── Hardware seam (Strumento ≥ 0.2: backend adapter + experiment factory) ───
+# ──── Hardware seam (Strumento ≥ 0.3: backend adapter + experiment factory) ───
 # The closed-loop hardware seam, relocated from Strumento.jl's v0.1.x tree when
 # its v0.2 standalone release severed the inverted dependency edge. The soc
 # substrate lives below this package; the backend adapter and the experiment
@@ -159,7 +159,7 @@ export pauli_covariance, population_covariance, wigner_covariance
 export pauli, pop
 export AbstractHardwareBackend
 export upload_pulse!, trigger!, readout, sample_rate
-# The hardware seam (Strumento ≥ 0.2): the backend adapter over an AbstractSoc
+# The hardware seam (Strumento ≥ 0.3): the backend adapter over an AbstractSoc
 # and its experiment factory — relocated here from the substrate at its v0.2.
 export StrumentoBackend, StrumentoExperiment
 export ExperimentRecord

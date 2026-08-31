@@ -17,7 +17,7 @@ device's discrimination / knot-index layout), so it is **not** part of this
 generic contract — a backend ships its own experiment factory that builds a
 [`HardwareExperiment`](@ref) whose `run` closure chains
 upload → trigger → readout → discriminate (see this package's Strumento seam —
-`StrumentoBackend` / `StrumentoExperiment` in `src/hardware/`, over Strumento ≥ 0.2's
+`StrumentoBackend` / `StrumentoExperiment` in `src/hardware/`, over Strumento ≥ 0.3's
 `AbstractSoc` — for the reference pattern).
 
 These are declared as generic functions (not merely documented prose) so a

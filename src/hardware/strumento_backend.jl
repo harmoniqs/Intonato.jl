@@ -1,4 +1,4 @@
-# StrumentoBackend — the AbstractHardwareBackend over an AbstractSoc (Strumento ≥ 0.2),
+# StrumentoBackend — the AbstractHardwareBackend over an AbstractSoc (Strumento ≥ 0.3),
 # relocated here from Strumento.jl (its src/backend.jl @ 12a05b4) when Strumento's
 # v0.2 release severed the inverted dependency edge: the calibration-loop chassis
 # (this package) now sits ABOVE the soc substrate and owns the hardware seam.
@@ -20,7 +20,7 @@
 """
     StrumentoBackend(soc, channel_map, indices; discriminator = b -> real.(b))
 
-Hardware backend bridging a pulse to a soc (Strumento ≥ 0.2: `AbstractSoc` + its
+Hardware backend bridging a pulse to a soc (Strumento ≥ 0.3: `AbstractSoc` + its
 verbs). `indices` are the measurement knot indices (into `1:N`) the readout
 produces; `discriminator` maps one IQ blob to a data vector (default: real part,
 matching `MockSoc`'s populations forward model). `last_raw` holds the most recent
@@ -73,9 +73,11 @@ sample_rate(b::StrumentoBackend) = dac_rate(b.soc)
 @testitem "StrumentoBackend upload/trigger/readout against MockSoc" begin
     using Intonato
     using LinearAlgebra
-    # MockSoc arrives via the Strumento reexport (a top-level export in the
-    # registered 0.2 tarball; the reexport testitem covers the extension-split
-    # reach for future substrate releases).
+    # MockSoc arrives via the extension-aware reexport: Strumento 0.3 defines it
+    # in StrumentoPiccoloExt (extension exports never surface on the parent
+    # module on Julia 1.12), so Intonato binds it from the attached extension
+    # — Piccolo is a hard dep, so the extension is always loaded here — and
+    # re-exports it (the reexport testitem pins the mechanism).
     σx = ComplexF64[0 1; 1 0]
     σz = ComplexF64[1 0; 0 -1]
     sys = QuantumSystem(1.0 * σz, [σx], [1.0])
