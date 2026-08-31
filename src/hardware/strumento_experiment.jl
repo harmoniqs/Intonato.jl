@@ -48,8 +48,9 @@ end
     N = 11
     pulse = LinearSplinePulse(0.1 .* randn(1, N), collect(range(0.0, 5.0, length = N)))
     map = QickChannelMap([QickGenChannel(0, 5e9; i_drive = 1)]; n_drives = 1)
-    # `populations` here is Intonato's export (Strumento ≥ 0.2 keeps a substrate-
-    # local UNexported twin precisely so this single public binding governs).
+    # `populations` here is Intonato's export (Strumento ≥ 0.3 keeps a substrate-
+    # local UNexported twin in its Piccolo extension precisely so this single
+    # public binding governs).
     model = MeasurementModel(:ψ̃, [populations], [N])
 
     soc = MockSoc(sys, ComplexF64[1, 0], ComplexF64[0, 1]; dac_rate = 50.0)
