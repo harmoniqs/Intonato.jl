@@ -98,6 +98,10 @@ include("noise/noise_stats.jl")
 include("noise/noise_stats_test.jl")
 include("noise/whitening.jl")
 include("noise/whitening_test.jl")
+# Binomial Fisher / IRLS weighting (exact-likelihood statistics on the
+# measurement surface — the A1 thin split's public increment).
+include("noise/fisher_irls.jl")
+include("noise/fisher_irls_test.jl")
 
 # ──── Measurement functions ──────────────────────────────────────────────────
 include("measurement_functions/state_measurements.jl")
@@ -167,6 +171,8 @@ export AbstractExperimentLogger, NullExperimentLogger, InMemoryExperimentLogger,
 
 # Noise statistics + whitening (GLS)
 export noise_floor, debiased_cost, cost_std, diff_std, whiten
+# Binomial Fisher / IRLS measurement weighting (exact-likelihood statistics)
+export binomial_fisher_information, binomial_fisher_weights
 
 # Core interface
 export run_experiment, model_predict, measurement_error
