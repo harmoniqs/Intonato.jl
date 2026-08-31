@@ -31,9 +31,10 @@ Piccolo = "1.15, 2.0"
 Random = "1.11"
 Reexport = "1.2"
 SpecialFunctions = "2.7"
-# Exact minor: 0.2.0 (registered) carries everything the relocated seam needs;
+# Exact minor: 0.3 carries the duration fix (bound from its defining module) and
+# the extension split (Piccolo/PythonCall weakdeps; the socs live in extensions);
 # do not float into unreleased main content.
-Strumento = "0.2"
+Strumento = "0.3"
 TestItemRunner = "1.1"
 TestItems = "1.0"
 julia = "1.12"

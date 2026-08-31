@@ -4,6 +4,21 @@
 # relocation: the substrate reexported the chassis in Strumento ≤ 0.1; the chassis
 # reexports the substrate now, matching the dependency direction).
 
+# The resolution pin: the compat entry pins the exact minor (0.3), so a fresh
+# resolution must land on Strumento 0.3.x — never fall back to the 0.2 line
+# (the 0.2.0 tarball carried the fresh-resolution `duration` hazard the retired
+# __init__ heal used to paper over; 0.3 fixes it at the substrate). This item
+# FAILS if the resolver hands the suite a 0.2.x Strumento.
+@testitem "fresh resolution pulls Strumento 0.3.x (compat pins the exact minor)" begin
+    using Pkg
+    deps = Pkg.dependencies()
+    STRUMENTO_UUID = Base.UUID("9a96c2ab-728f-48d1-a688-c746ce4d362f")
+    @test haskey(deps, STRUMENTO_UUID)
+    dep = deps[STRUMENTO_UUID]
+    @test dep.name == "Strumento"
+    @test v"0.3" <= dep.version < v"0.4"
+end
+
 @testitem "using Intonato exposes the soc layer; Measurement stays Intonato's" begin
     using Intonato
     import Strumento   # module handle only: no export surface brought in
