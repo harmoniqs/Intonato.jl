@@ -333,9 +333,16 @@ const M3B_FIT_BRACKET_KHZ = 40.0
 const M3B_FIT_STEP_KHZ = 2.0
 
 m3b_drift_phases_pending() = false
-# the AC4 replay cast (three full rehearsals per suite run) is still pending —
-# its own marker so flipping the drift flag above doesn't drag the replay in
-m3b_replay_pending() = true
+# AC4's replay is live: three rehearsals per suite run (two in-process + one
+# fresh child process) at the replay item's pinned minimal budget
+m3b_replay_pending() = false
+
+# the replay item's rehearsal budget: ONE drift epoch — every mechanism of the
+# whole rehearsal (QCP, twin soc, loop, χ-fit, replan, acceptance, advance!,
+# calibrate!, the paired control) runs and is digest-pinned at this
+# configuration; the epoch count only scales the wall-clock (~2.6 min/rehearsal
+# vs ~6 at the drift item's 3), keeping the suite's three replay runs reasonable
+const M3B_REPLAY_EPOCHS = 1
 
 # the rehearsal's replay seed (pinned once, used by every rehearsal testitem —
 # each testitem is its own module, so the seed lives here, in the harness)

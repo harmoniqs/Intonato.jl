@@ -115,22 +115,21 @@ end
     import Strumento
     include(joinpath(@__DIR__, "rehearsal_harness.jl"))
 
-    # ── CAST SCOPING (#37) ──────────────────────────────────────────────────────
-    # AC4's replay covers the WHOLE rehearsal (baseline + drift + control) and
-    # costs three full rehearsals (two in-process + one fresh child process).
-    # The drift/control phases landed with cast 2; the replay cast runs this
-    # item's pinned assertions — still pending behind its own guard.
-    if m3b_replay_pending()
-        @test_skip "AC4 pending (full-rehearsal replay, ~3× rehearsal wall-clock) — lands with the replay cast"
-    else
+    # ── AC4 — seeded replay: the whole rehearsal reproduces bit-exactly ──────
+    # Three rehearsals per suite run: two in-process (fresh process OBJECTS,
+    # same seed) and one FRESH JULIA PROCESS (same seed) — all three digests
+    # must match bit-exactly (the twin's StableRNG and the QCP's deterministic
+    # solve both pinned; the digest serializes every summary field as Float64
+    # bit patterns — == at the bit level, no cross-environment float goldens).
+    # Budget: the item's rehearsals run at M3B_REPLAY_EPOCHS (documented in the
+    # harness) — every mechanism is live and pinned at that configuration.
 
     # fresh process OBJECTS, same seed — identical summaries (within-process ==)
-    s1 = run_rehearsal(REHEARSAL_SEED)
-    s2 = run_rehearsal(REHEARSAL_SEED)
+    s1 = run_rehearsal(REHEARSAL_SEED; n_epochs = M3B_REPLAY_EPOCHS)
+    s2 = run_rehearsal(REHEARSAL_SEED; n_epochs = M3B_REPLAY_EPOCHS)
     @test rehearsal_digest(s1) == rehearsal_digest(s2)
 
     # a FRESH JULIA PROCESS, same seed — the digest must match bit-exactly
-    # (the twin's StableRNG and the QCP's deterministic solve both pinned)
     dir = mktempdir()
     driver = joinpath(dir, "replay_child.jl")
     write(driver, """
@@ -139,7 +138,7 @@ end
         using Intonato
         import Strumento
         include($(repr(joinpath(@__DIR__, "rehearsal_harness.jl"))))
-        s = run_rehearsal($REHEARSAL_SEED)
+        s = run_rehearsal($REHEARSAL_SEED; n_epochs = $M3B_REPLAY_EPOCHS)
         println("M3B_DIGEST=", rehearsal_digest(s))
         """)
     proj = dirname(Base.active_project())
@@ -148,6 +147,4 @@ end
     digests = [strip(split(line, "=")[2]) for line in split(out, "\n") if startswith(line, "M3B_DIGEST=")]
     @test length(digests) == 1
     @test digests[1] == rehearsal_digest(s1)
-
-    end # m3b_drift_phases_pending
 end
