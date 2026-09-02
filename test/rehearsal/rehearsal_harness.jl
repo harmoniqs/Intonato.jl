@@ -44,9 +44,10 @@ const M3B_N_FOCK = 4
 # excitation. Kerr in the ladder convention E_n = ωn + (α/2)n(n−1). Drive order:
 # [transmon I, transmon Q, cavity I, cavity Q]. Units: rad·GHz ⇒ rollout time ns.
 function rehearsal_family(truth::Dict{Symbol,Float64})
-    χ  = 2π * truth[:chi_kHz] * 1e-6          # kHz → rad/ns
+    χ = 2π * truth[:chi_kHz] * 1e-6          # kHz → rad/ns
     α_c = 2π * truth[:K_c_kHz] * 1e-6
-    n_t = Int(truth[:N_transmon]); n_f = Int(truth[:N_fock])
+    n_t = Int(truth[:N_transmon])
+    n_f = Int(truth[:N_fock])
     a = kron(annihilate(n_f), Matrix{ComplexF64}(I, n_t, n_t))
     q = kron(Matrix{ComplexF64}(I, n_f, n_f), annihilate(n_t))
     na, nq = a'a, q'q
@@ -69,28 +70,31 @@ function _ancilla_marginal(iso::AbstractVector{<:Real}, n_t::Int, n_f::Int)
     n = length(iso)
     (n == 2 * d || n == 2 * d^2) || error(
         "rehearsal ancilla marginal: expected an iso-packed ket (length $(2d)) or " *
-        "vectorized density matrix (length $(2d^2)); got length $n")
+        "vectorized density matrix (length $(2d^2)); got length $n",
+    )
     joint = Vector{Float64}(undef, d)
     if n == 2 * d^2
-        for i in 1:d
-            joint[i] = Float64(iso[(i - 1) * d + i])    # ρ_ii (real diagonal)
+        for i = 1:d
+            joint[i] = Float64(iso[(i-1)*d+i])    # ρ_ii (real diagonal)
         end
     else
-        for i in 1:d
-            re, im_ = iso[i], iso[d + i]
+        for i = 1:d
+            re, im_ = iso[i], iso[d+i]
             joint[i] = re^2 + im_^2
         end
     end
     p = zeros(Float64, n_t)
-    for i in 1:d
-        p[((i - 1) % n_t) + 1] += joint[i]              # sum the fock axis
+    for i = 1:d
+        p[((i-1)%n_t)+1] += joint[i]              # sum the fock axis
     end
     return p
 end
 rehearsal_ancilla_marginal(iso) = _ancilla_marginal(iso, M3B_N_TRANSMON, M3B_N_FOCK)
 
 m3b_psi0() = begin                                # |g,0⟩ — fock 0, transmon g
-    ψ = zeros(ComplexF64, M3B_N_TRANSMON * M3B_N_FOCK); ψ[1] = 1.0; ψ
+    ψ = zeros(ComplexF64, M3B_N_TRANSMON * M3B_N_FOCK)
+    ψ[1] = 1.0
+    ψ
 end
 
 # ── the structured Ramsey prep (the QCP's target class) ───────────────────────
@@ -120,7 +124,8 @@ function structured_prep(truth::Dict{Symbol,Float64})
     u = zeros(4, M3B_N_KNOTS)
     for (i, t) in enumerate(times)
         if t <= T_disp                              # cavity I: sin²-ramped displacement
-            w = t < 150 ? sint(t / 300) :
+            w =
+                t < 150 ? sint(t / 300) :
                 (t > T_disp - 150 ? sint((T_disp - t) / 300) : 1.0)
             u[3, i] = ε_c * w
         elseif t <= T_disp + T_spec                 # transmon I: narrowband comb pulse
@@ -138,17 +143,20 @@ end
 "the nominal QCP: unsolved, warm-started at the structured prep (caller solves)"
 function nominal_qcp(truth::Dict{Symbol,Float64}, pulse, ψt)
     sys = rehearsal_family(truth)
-    return SplinePulseProblem(KetTrajectory(sys, pulse, m3b_psi0(), ψt), M3B_N_KNOTS;
-                              Q = M3B_Q, R = M3B_R)
+    return SplinePulseProblem(
+        KetTrajectory(sys, pulse, m3b_psi0(), ψt),
+        M3B_N_KNOTS;
+        Q = M3B_Q,
+        R = M3B_R,
+    )
 end
 
 # ── truth-side evaluation (the harness's evidence — never loop input) ─────────
-_truth_fidelity(truth::Dict{Symbol,Float64}, pulse::AbstractPulse, times, ψt) =
-    begin
-        sys = rehearsal_family(truth)
-        qt = rollout(KetTrajectory(sys, pulse, m3b_psi0(), ψt), pulse)
-        return abs(dot(ψt, qt(times[end])))^2
-    end
+_truth_fidelity(truth::Dict{Symbol,Float64}, pulse::AbstractPulse, times, ψt) = begin
+    sys = rehearsal_family(truth)
+    qt = rollout(KetTrajectory(sys, pulse, m3b_psi0(), ψt), pulse)
+    return abs(dot(ψt, qt(times[end])))^2
+end
 truth_fidelity(truth::Dict{Symbol,Float64}, qcp, times, ψt) =
     _truth_fidelity(truth, get_pulse(qcp.qtraj), times, ψt)
 truth_fidelity(truth::Dict{Symbol,Float64}, pulse::AbstractPulse, times, ψt) =
@@ -160,7 +168,8 @@ truth_fidelity(truth::Dict{Symbol,Float64}, pulse::AbstractPulse, times, ψt) =
 # (~5e-4/kHz demonstrated) — the χ-fit's signal.
 const M3B_DAC_RATE = 0.1
 const M3B_MEAS_TIMES = [4500.0, 5500.0, 6500.0, 7500.0, 8500.0, 10000.0]
-m3b_dac_times() = collect(range(0.0, M3B_T_GATE, length = round(Int, M3B_T_GATE * M3B_DAC_RATE) + 1))
+m3b_dac_times() =
+    collect(range(0.0, M3B_T_GATE, length = round(Int, M3B_T_GATE * M3B_DAC_RATE) + 1))
 m3b_meas_indices() = [round(Int, t * M3B_DAC_RATE) + 1 for t in M3B_MEAS_TIMES]
 m3b_meas_times() = begin
     dac = m3b_dac_times()
@@ -179,11 +188,13 @@ function goal_measurements(truth::Dict{Symbol,Float64}, pulse, record)
     C = m3b_confusion(record)
     sys = rehearsal_family(truth)
     qt = rollout(KetTrajectory(sys, pulse, m3b_psi0(), m3b_psi0()), pulse)
-    idxs = m3b_meas_indices(); ts = m3b_meas_times()
+    idxs = m3b_meas_indices()
+    ts = m3b_meas_times()
     Measurement[
-        Measurement(C' * _ancilla_marginal(ket_to_iso(qt(t)), M3B_N_TRANSMON, M3B_N_FOCK),
-                    idxs[j])
-        for (j, t) in enumerate(ts)
+        Measurement(
+            C' * _ancilla_marginal(ket_to_iso(qt(t)), M3B_N_TRANSMON, M3B_N_FOCK),
+            idxs[j],
+        ) for (j, t) in enumerate(ts)
     ]
 end
 
@@ -193,13 +204,20 @@ end
 # the Fisher-weighted SSR"); the shot-statistics model is the weights' source
 function measurement_models(shots::Int)
     idxs = m3b_meas_indices()
-    chassis = MeasurementModel(:ψ̃,
-        DeterministicMeasurement[DeterministicMeasurement(rehearsal_ancilla_marginal)
-                                 for _ in idxs], idxs)
-    shot = MeasurementModel(:ψ̃,
-        ShotNoiseMeasurement[ShotNoiseMeasurement(rehearsal_ancilla_marginal, shots,
-                                                  population_covariance) for _ in idxs],
-        idxs)
+    chassis = MeasurementModel(
+        :ψ̃,
+        DeterministicMeasurement[
+            DeterministicMeasurement(rehearsal_ancilla_marginal) for _ in idxs
+        ],
+        idxs,
+    )
+    shot = MeasurementModel(
+        :ψ̃,
+        ShotNoiseMeasurement[
+            ShotNoiseMeasurement(rehearsal_ancilla_marginal, shots, population_covariance) for _ in idxs
+        ],
+        idxs,
+    )
     return chassis, shot
 end
 
@@ -220,8 +238,7 @@ mutable struct ChiTrackingModel <: Intonato.AbstractDeviceModel
     scan_step_kHz::Float64
     n_rollouts::Int
 end
-_truth_with_chi(m::ChiTrackingModel) =
-    merge(copy(m.truth_base), Dict(:chi_kHz => m.χ̂_kHz))
+_truth_with_chi(m::ChiTrackingModel) = merge(copy(m.truth_base), Dict(:chi_kHz => m.χ̂_kHz))
 
 function _model_response(m::ChiTrackingModel, pulse::AbstractPulse)
     sys = rehearsal_family(_truth_with_chi(m))
@@ -235,11 +252,16 @@ function _model_response(m::ChiTrackingModel, pulse::AbstractPulse)
     return out
 end
 
-function Intonato.predict(m::ChiTrackingModel, pulse::AbstractPulse,
-                          ::Intonato.MeasurementModel)
+function Intonato.predict(
+    m::ChiTrackingModel,
+    pulse::AbstractPulse,
+    ::Intonato.MeasurementModel,
+)
     flat = _model_response(m, pulse)
-    return Measurement[Measurement(flat[(j-1)*2 .+ (1:2)], m.meas_indices[j])
-                       for j in eachindex(m.meas_indices)]
+    return Measurement[
+        Measurement(flat[(j-1)*2 .+ (1:2)], m.meas_indices[j]) for
+        j in eachindex(m.meas_indices)
+    ]
 end
 
 function Intonato.adapt!(m::ChiTrackingModel, pulse::AbstractPulse, y_exp)
@@ -249,22 +271,29 @@ function Intonato.adapt!(m::ChiTrackingModel, pulse::AbstractPulse, y_exp)
         sum(abs2, _model_response(m, pulse) .- flat_exp)
     end
     # coarse grid over the bracket, then golden-section refine within ±step
-    best = Inf; bestχ = m.χ̂_kHz
-    for χ in (m.χ̂_kHz - m.bracket_kHz):m.scan_step_kHz:(m.χ̂_kHz + m.bracket_kHz)
+    best = Inf
+    bestχ = m.χ̂_kHz
+    for χ = (m.χ̂_kHz-m.bracket_kHz):m.scan_step_kHz:(m.χ̂_kHz+m.bracket_kHz)
         v = ssr(χ)
         if v < best
-            best = v; bestχ = χ
+            best = v
+            bestχ = χ
         end
     end
     φ = (sqrt(5) - 1) / 2
     a, b = bestχ - m.scan_step_kHz, bestχ + m.scan_step_kHz
-    c = b - φ * (b - a); d = a + φ * (b - a)
+    c = b - φ * (b - a)
+    d = a + φ * (b - a)
     fc, fd = ssr(c), ssr(d)
-    for _ in 1:24
+    for _ = 1:24
         if fc < fd
-            b, d, fd = d, c, fc; c = b - φ * (b - a); fc = ssr(c)
+            b, d, fd = d, c, fc
+            c = b - φ * (b - a)
+            fc = ssr(c)
         else
-            a, c, fc = c, d, fd; d = a + φ * (b - a); fd = ssr(d)
+            a, c, fc = c, d, fd
+            d = a + φ * (b - a)
+            fd = ssr(d)
         end
     end
     m.χ̂_kHz = (a + b) / 2
@@ -320,12 +349,12 @@ end
 # drift path replayed via JumpSchedule, model frozen at NominalModel).
 # phases = :baseline runs the skeleton's static-truth phase only.
 const M3B_SHOTS = 20_000        # sized so the GLS statistic discriminates the
-                                # drift scale from the χ²(12) shot floor
+# drift scale from the χ²(12) shot floor
 const M3B_TOL = 40.0            # convergence: the Fisher-weighted SSR consistent
-                                # with pure shot noise (χ²(12), mean 12)
+# with pure shot noise (χ²(12), mean 12)
 const M3B_QCP_MAX_ITER = 12
 const M3B_REPLAN_IPOPT = 15     # the per-epoch replan must fully re-converge
-                                # against the refit model (~one polish budget)
+# against the refit model (~one polish budget)
 const M3B_ITERS_PER_EPOCH = 2
 const M3B_EPOCH_DAYS = 5.0
 const M3B_N_EPOCHS = 3
@@ -375,13 +404,29 @@ end
 # bit-exact digest: Float64 bit patterns — replay compares == at the bit level
 _bits(x::Float64) = string(reinterpret(UInt64, x); base = 16)
 function rehearsal_digest(s::RehearsalSummary)
-    parts = String[string(s.seed), string(s.phases), string(s.shots),
-                   string(s.n_epochs), _bits(s.F_baseline), _bits(s.J_baseline),
-                   string(s.converged_baseline), _bits(s.est_error_max)]
-    for f in (:chi_truth, :chi_believed, :chi_estimated, :F_adapted, :F_control,
-              :J_adapted, :J_control, :truth_moved_on_advance,
-              :belief_moved_on_advance, :belief_moved_on_calibrate,
-              :truth_moved_on_calibrate)
+    parts = String[
+        string(s.seed),
+        string(s.phases),
+        string(s.shots),
+        string(s.n_epochs),
+        _bits(s.F_baseline),
+        _bits(s.J_baseline),
+        string(s.converged_baseline),
+        _bits(s.est_error_max),
+    ]
+    for f in (
+        :chi_truth,
+        :chi_believed,
+        :chi_estimated,
+        :F_adapted,
+        :F_control,
+        :J_adapted,
+        :J_control,
+        :truth_moved_on_advance,
+        :belief_moved_on_advance,
+        :belief_moved_on_calibrate,
+        :truth_moved_on_calibrate,
+    )
         push!(parts, join(_bits.(Float64.(collect(getfield(s, f)))), ","))
     end
     push!(parts, string(s.n_experiments_adapted), string(s.n_experiments_control))
@@ -391,14 +436,24 @@ end
 # the twin → soc face → backend adapter → experiment factory stack (one per run)
 function _rehearsal_experiment(twin, ψt, chassis_mm, shots)
     ext = Base.get_extension(Strumento, :StrumentoPiccoloExt)
-    soc = ext.TwinSoc(twin, m3b_psi0(), ψt;
-                      families = Dict("bosonic" => rehearsal_family),
-                      measurement_fn = rehearsal_ancilla_marginal,
-                      shots = shots, exact = false, dt = 0.0,
-                      dac_rate = M3B_DAC_RATE)
-    map = QickChannelMap([QickGenChannel(0, 5e9; i_drive = 1, q_drive = 2),
-                          QickGenChannel(1, 6e9; i_drive = 3, q_drive = 4)];
-                         n_drives = 4)
+    soc = ext.TwinSoc(
+        twin,
+        m3b_psi0(),
+        ψt;
+        families = Dict("bosonic" => rehearsal_family),
+        measurement_fn = rehearsal_ancilla_marginal,
+        shots = shots,
+        exact = false,
+        dt = 0.0,
+        dac_rate = M3B_DAC_RATE,
+    )
+    map = QickChannelMap(
+        [
+            QickGenChannel(0, 5e9; i_drive = 1, q_drive = 2),
+            QickGenChannel(1, 6e9; i_drive = 3, q_drive = 4),
+        ];
+        n_drives = 4,
+    )
     backend = StrumentoBackend(soc, map, m3b_meas_indices())
     return StrumentoExperiment(backend; measurement_model = chassis_mm)
 end
@@ -408,15 +463,21 @@ end
 # times, which are t = 0, epoch, 2·epoch, … (advance! passes the CURRENT twin
 # time to the plan BEFORE incrementing it, so the scheduled times start at 0)
 function _control_replay_plan(truth_path::Vector{Float64}, epoch_days::Float64)
-    times = [(k - 1) * epoch_days for k in 1:length(truth_path) - 1]
-    deltas = [truth_path[k + 1] - truth_path[k] for k in 1:length(truth_path) - 1]
-    return Strumento.DriftPlan(:chi_kHz => [Strumento.JumpSchedule(times = times,
-                                                                  deltas = deltas)])
+    times = [(k - 1) * epoch_days for k = 1:(length(truth_path)-1)]
+    deltas = [truth_path[k+1] - truth_path[k] for k = 1:(length(truth_path)-1)]
+    return Strumento.DriftPlan(
+        :chi_kHz => [Strumento.JumpSchedule(times = times, deltas = deltas)],
+    )
 end
 
-function run_rehearsal(seed::Integer; phases::Symbol = :full,
-                       n_epochs::Int = M3B_N_EPOCHS, shots::Int = M3B_SHOTS,
-                       qcp_max_iter::Int = M3B_QCP_MAX_ITER, verbose::Bool = false)
+function run_rehearsal(
+    seed::Integer;
+    phases::Symbol = :full,
+    n_epochs::Int = M3B_N_EPOCHS,
+    shots::Int = M3B_SHOTS,
+    qcp_max_iter::Int = M3B_QCP_MAX_ITER,
+    verbose::Bool = false,
+)
     phases in (:baseline, :full) ||
         throw(ArgumentError("phases must be :baseline or :full, got :$phases"))
 
@@ -432,10 +493,16 @@ function run_rehearsal(seed::Integer; phases::Symbol = :full,
     procs == ["ou", "ramp"] ||
         error("rehearsal: the fixture's χ prior must compose [ou, ramp], got $procs")
     σ_stat = Float64(prior["sigma_rel"]) * abs(believed_truth[:chi_kHz])
-    plan = Strumento.DriftPlan(:chi_kHz =>
-        [Strumento.OrnsteinUhlenbeck(theta = 1.0 / Float64(prior["tau_days"]),
-                                     sigma = σ_stat, mu = believed_truth[:chi_kHz]),
-         Strumento.Ramp(rate = Float64(prior["ramp_kHz_per_day"]))])
+    plan = Strumento.DriftPlan(
+        :chi_kHz => [
+            Strumento.OrnsteinUhlenbeck(
+                theta = 1.0 / Float64(prior["tau_days"]),
+                sigma = σ_stat,
+                mu = believed_truth[:chi_kHz],
+            ),
+            Strumento.Ramp(rate = Float64(prior["ramp_kHz_per_day"])),
+        ],
+    )
 
     # 1. the nominal QCP at the BELIEVED parameters: the analytic structured
     #    prep warm start, polished by a deterministic Ipopt solve
@@ -457,19 +524,34 @@ function run_rehearsal(seed::Integer; phases::Symbol = :full,
     # 4. the adapting loop's machinery: the χ-tracking device model + the
     #    model-replan strategy (on static truth the baseline phase converges at
     #    the shot floor before they fire; the drift epochs drive them)
-    devmodel = ChiTrackingModel(believed_truth, m3b_psi0(), ψt, m3b_meas_times(),
-                                m3b_meas_indices(), m3b_confusion(record),
-                                Float64(believed_truth[:chi_kHz]), M3B_FIT_BRACKET_KHZ,
-                                M3B_FIT_STEP_KHZ, 0)
-    strategy = ModelReplanStrategy(ψ0 = m3b_psi0(), ψt = ψt,
-                                   max_ipopt_iter = M3B_REPLAN_IPOPT)
+    devmodel = ChiTrackingModel(
+        believed_truth,
+        m3b_psi0(),
+        ψt,
+        m3b_meas_times(),
+        m3b_meas_indices(),
+        m3b_confusion(record),
+        Float64(believed_truth[:chi_kHz]),
+        M3B_FIT_BRACKET_KHZ,
+        M3B_FIT_STEP_KHZ,
+        0,
+    )
+    strategy =
+        ModelReplanStrategy(ψ0 = m3b_psi0(), ψt = ψt, max_ipopt_iter = M3B_REPLAN_IPOPT)
 
     # 5. the static-truth baseline QILC phase: PulseTuningProblem through the
     #    SocBackend over TwinSoc — converges when the weighted residual is
     #    consistent with pure shot noise
-    ptp = PulseTuningProblem(qcp, qexp, chassis_mm; strategy = strategy,
-                             device_model = devmodel, y_goal = y_goal,
-                             W_task = W_task, verbose = verbose)
+    ptp = PulseTuningProblem(
+        qcp,
+        qexp,
+        chassis_mm;
+        strategy = strategy,
+        device_model = devmodel,
+        y_goal = y_goal,
+        W_task = W_task,
+        verbose = verbose,
+    )
     Piccolo.solve!(ptp; max_iter = 3, tol = M3B_TOL, verbose = verbose)
     J_baseline = ptp.result.history[end].J_exp
     converged_baseline = ptp.result.converged
@@ -494,7 +576,7 @@ function run_rehearsal(seed::Integer; phases::Symbol = :full,
         # harness-owned choreography: advance! between iteration batches, with
         # TwinSoc's per-acquire dt staying 0 so the drift timing is explicit;
         # calibrate! write-back at each epoch's checkpoint (belief only)
-        for k in 1:n_epochs
+        for k = 1:n_epochs
             # drift injection — truth moves, belief must hold
             χ_pre = twin.truth[:chi_kHz]
             b_pre = Strumento.believed(twin)["chi_kHz"]
@@ -506,22 +588,28 @@ function run_rehearsal(seed::Integer; phases::Symbol = :full,
             # the QILC phase against the drifted truth: the chassis's adapt!
             # refits χ̂ from the loop's own data, the strategy replans against
             # the refit model, the acceptance measures on the twin
-            Piccolo.solve!(ptp; max_iter = M3B_ITERS_PER_EPOCH, tol = M3B_TOL,
-                           verbose = verbose)
+            Piccolo.solve!(
+                ptp;
+                max_iter = M3B_ITERS_PER_EPOCH,
+                tol = M3B_TOL,
+                verbose = verbose,
+            )
             n_exp_a += ptp.result.n_experiments
 
             # checkpoint: the loop's estimate vs the drifted truth
             push!(chi_truth, twin.truth[:chi_kHz])
             push!(chi_estimated, devmodel.χ̂_kHz)
-            push!(F_adapted, truth_fidelity(twin.truth, get_pulse(qcp.qtraj),
-                                            times, ψt))
+            push!(F_adapted, truth_fidelity(twin.truth, get_pulse(qcp.qtraj), times, ψt))
             push!(J_adapted, ptp.result.history[end].J_exp)
 
             # the belief write-back — calibration moves belief, never truth
             b_pre_cal = Strumento.believed(twin)["chi_kHz"]
             χ_pre_cal = twin.truth[:chi_kHz]
             Strumento.calibrate!(twin, Dict("chi_kHz" => devmodel.χ̂_kHz))
-            push!(belief_moved_on_calibrate, Strumento.believed(twin)["chi_kHz"] != b_pre_cal)
+            push!(
+                belief_moved_on_calibrate,
+                Strumento.believed(twin)["chi_kHz"] != b_pre_cal,
+            )
             push!(truth_moved_on_calibrate, twin.truth[:chi_kHz] != χ_pre_cal)
             push!(chi_believed, Strumento.believed(twin)["chi_kHz"])
         end
@@ -532,46 +620,78 @@ function run_rehearsal(seed::Integer; phases::Symbol = :full,
         # frozen at the believed parameters (NominalModel: adapt! is a no-op),
         # so the control's replans optimize against the stale model and cannot
         # track the drift
-        twin_c = Strumento.instantiate(rehearsal_fixture_path();
-                                       drift = _control_replay_plan(truth_path,
-                                                                    M3B_EPOCH_DAYS),
-                                       seed = seed)
+        twin_c = Strumento.instantiate(
+            rehearsal_fixture_path();
+            drift = _control_replay_plan(truth_path, M3B_EPOCH_DAYS),
+            seed = seed,
+        )
         qexp_c = _rehearsal_experiment(twin_c, ψt, chassis_mm, shots)
         qcp_c = SplinePulseProblem(
             KetTrajectory(rehearsal_family(believed_truth), pulse_solved, m3b_psi0(), ψt),
-            M3B_N_KNOTS; Q = M3B_Q, R = M3B_R)   # warm at the solved pulse; no re-solve
-        ptp_c = PulseTuningProblem(qcp_c, qexp_c, chassis_mm;
-                                   strategy = ModelReplanStrategy(ψ0 = m3b_psi0(),
-                                                                  ψt = ψt,
-                                                                  max_ipopt_iter =
-                                                                      M3B_REPLAN_IPOPT),
-                                   device_model = NominalModel(
-                                       rehearsal_family(believed_truth), m3b_psi0(), ψt),
-                                   y_goal = y_goal, W_task = W_task, verbose = verbose)
+            M3B_N_KNOTS;
+            Q = M3B_Q,
+            R = M3B_R,
+        )   # warm at the solved pulse; no re-solve
+        ptp_c = PulseTuningProblem(
+            qcp_c,
+            qexp_c,
+            chassis_mm;
+            strategy = ModelReplanStrategy(
+                ψ0 = m3b_psi0(),
+                ψt = ψt,
+                max_ipopt_iter = M3B_REPLAN_IPOPT,
+            ),
+            device_model = NominalModel(rehearsal_family(believed_truth), m3b_psi0(), ψt),
+            y_goal = y_goal,
+            W_task = W_task,
+            verbose = verbose,
+        )
         n_exp_c = 0
-        for k in 1:n_epochs
+        for k = 1:n_epochs
             Strumento.advance!(twin_c, M3B_EPOCH_DAYS)   # fires the scheduled delta
-            Piccolo.solve!(ptp_c; max_iter = M3B_ITERS_PER_EPOCH, tol = M3B_TOL,
-                           verbose = verbose)
+            Piccolo.solve!(
+                ptp_c;
+                max_iter = M3B_ITERS_PER_EPOCH,
+                tol = M3B_TOL,
+                verbose = verbose,
+            )
             n_exp_c += ptp_c.result.n_experiments
-            push!(F_control, truth_fidelity(twin_c.truth, get_pulse(qcp_c.qtraj),
-                                            times, ψt))
+            push!(
+                F_control,
+                truth_fidelity(twin_c.truth, get_pulse(qcp_c.qtraj), times, ψt),
+            )
             push!(J_control, ptp_c.result.history[end].J_exp)
         end
 
         # the loop's demonstrated estimation error (post-fit checkpoints)
-        est_error_max = maximum(abs(chi_estimated[k] - chi_truth[k])
-                                for k in 2:length(chi_truth))
+        est_error_max =
+            maximum(abs(chi_estimated[k] - chi_truth[k]) for k = 2:length(chi_truth))
     else
         est_error_max = 0.0
         n_exp_c = 0
     end
 
-    return RehearsalSummary(Int(seed), phases, shots, n_epochs,
-                            F_baseline, J_baseline, converged_baseline,
-                            chi_truth, chi_believed, chi_estimated,
-                            F_adapted, F_control, J_adapted, J_control,
-                            n_exp_a, n_exp_c, est_error_max,
-                            truth_moved_on_advance, belief_moved_on_advance,
-                            belief_moved_on_calibrate, truth_moved_on_calibrate)
+    return RehearsalSummary(
+        Int(seed),
+        phases,
+        shots,
+        n_epochs,
+        F_baseline,
+        J_baseline,
+        converged_baseline,
+        chi_truth,
+        chi_believed,
+        chi_estimated,
+        F_adapted,
+        F_control,
+        J_adapted,
+        J_control,
+        n_exp_a,
+        n_exp_c,
+        est_error_max,
+        truth_moved_on_advance,
+        belief_moved_on_advance,
+        belief_moved_on_calibrate,
+        truth_moved_on_calibrate,
+    )
 end

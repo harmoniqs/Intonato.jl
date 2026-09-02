@@ -46,12 +46,15 @@
     @test H[idx(2, 2), idx(2, 2)] ≈ χ             # cavity 1-photon, ancilla e: the χ pull
 
     # the family is a function of CURRENT truth (drift is felt, not cached)
-    truth2 = copy(truth); truth2[:chi_kHz] += 1000.0
+    truth2 = copy(truth)
+    truth2[:chi_kHz] += 1000.0
     @test Matrix(rehearsal_family(truth2).H_drift)[idx(2, 2), idx(2, 2)] ≈ χ + 2π * 1e-3
 
     # the ancilla marginal: transmon populations, cavity traced out, sums to 1
     # (spread over the joint space: |e,0⟩ ⊕ |g,3⟩ — fock 4 is the cutoff's top)
-    ψ = zeros(ComplexF64, 8); ψ[idx(1, 2)] = 0.8; ψ[idx(4, 1)] = 0.6im
+    ψ = zeros(ComplexF64, 8)
+    ψ[idx(1, 2)] = 0.8
+    ψ[idx(4, 1)] = 0.6im
     m = rehearsal_ancilla_marginal(ket_to_iso(ψ))
     @test m ≈ [0.6^2, 0.8^2] atol = 1e-12
 
@@ -64,7 +67,8 @@
     @test F ≥ 0.99                                # the baseline gate (machinery: ≥0.998 demonstrated)
 end
 
-@testitem "M3b rehearsal: converge, drift, track, write back (adapted vs paired control)" tags = [:m3b] begin
+@testitem "M3b rehearsal: converge, drift, track, write back (adapted vs paired control)" tags =
+    [:m3b] begin
     using Intonato
     import Strumento
     using LinearAlgebra
@@ -110,7 +114,8 @@ end
           abs(summary.chi_truth[1] - summary.chi_truth[end])
 end
 
-@testitem "M3b rehearsal: seeded replay is bit-exact (in-process + fresh child process)" tags = [:m3b] begin
+@testitem "M3b rehearsal: seeded replay is bit-exact (in-process + fresh child process)" tags =
+    [:m3b] begin
     using Intonato
     import Strumento
     include(joinpath(@__DIR__, "rehearsal_harness.jl"))
@@ -132,19 +137,25 @@ end
     # a FRESH JULIA PROCESS, same seed — the digest must match bit-exactly
     dir = mktempdir()
     driver = joinpath(dir, "replay_child.jl")
-    write(driver, """
-        using Pkg
-        Pkg.activate($(repr(dirname(Base.active_project()))))
-        using Intonato
-        import Strumento
-        include($(repr(joinpath(@__DIR__, "rehearsal_harness.jl"))))
-        s = run_rehearsal($REHEARSAL_SEED; n_epochs = $M3B_REPLAY_EPOCHS)
-        println("M3B_DIGEST=", rehearsal_digest(s))
-        """)
+    write(
+        driver,
+        """
+using Pkg
+Pkg.activate($(repr(dirname(Base.active_project()))))
+using Intonato
+import Strumento
+include($(repr(joinpath(@__DIR__, "rehearsal_harness.jl"))))
+s = run_rehearsal($REHEARSAL_SEED; n_epochs = $M3B_REPLAY_EPOCHS)
+println("M3B_DIGEST=", rehearsal_digest(s))
+""",
+    )
     proj = dirname(Base.active_project())
     cmd = `$(Base.julia_cmd()) --startup-file=no --project=$proj $driver`
     out = read(cmd, String)
-    digests = [strip(split(line, "=")[2]) for line in split(out, "\n") if startswith(line, "M3B_DIGEST=")]
+    digests = [
+        strip(split(line, "=")[2]) for
+        line in split(out, "\n") if startswith(line, "M3B_DIGEST=")
+    ]
     @test length(digests) == 1
     @test digests[1] == rehearsal_digest(s1)
 end
