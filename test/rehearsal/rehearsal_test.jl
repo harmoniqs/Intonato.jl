@@ -31,7 +31,7 @@
     @test record.family == "bosonic"
     @test record.id == "synthetic-bosonic-rehearsal"
     @test record.parameters["chi_kHz"] == -300.0
-    @test record.drift_priors["chi_kHz"]["process"] == "ou"
+    @test record.drift_priors["chi_kHz"]["process"] == ["ou", "ramp"]
 
     # family: the record's truth builds the dispersive cavity⊗transmon system —
     # closed-form check at the fixed diagonal structure (rotating frame)
@@ -80,16 +80,6 @@ end
     # its shot-noise floor is χ²(12) (mean 12); the gate sits well above it
     @test summary.J_baseline ≤ 40.0
 
-    # ── CAST SCOPING (#37) ──────────────────────────────────────────────────────
-    # This cast lands the skeleton + the static-truth baseline (AC1, above). The
-    # drift epochs, the paired no-adaptation control, and the calibrate!
-    # write-back (AC2/AC3) are the NEXT cast's work: the pinned assertions below
-    # are kept VERBATIM behind the pending guard so the suite stays green
-    # meanwhile — the guard flips when run_rehearsal implements phases=:full.
-    if m3b_drift_phases_pending()
-        @test_skip "AC2/AC3 pending (drift tracked, control sags, belief write-back) — land with the drift/control cast"
-    else
-
     # ── AC2 — drift injected and TRACKED: adapted recovers, frozen control sags ──
     # the control (same seed, same drift path — the adapted run's recorded path is
     # replayed via JumpSchedule — model frozen) sags below the baseline by a
@@ -118,8 +108,6 @@ end
     # truth than the frozen record value is
     @test abs(summary.chi_believed[end] - summary.chi_truth[end]) <
           abs(summary.chi_truth[1] - summary.chi_truth[end])
-
-    end # m3b_drift_phases_pending
 end
 
 @testitem "M3b rehearsal: seeded replay is bit-exact (in-process + fresh child process)" tags = [:m3b] begin
@@ -128,12 +116,12 @@ end
     include(joinpath(@__DIR__, "rehearsal_harness.jl"))
 
     # ── CAST SCOPING (#37) ──────────────────────────────────────────────────────
-    # AC4's replay covers the WHOLE rehearsal (baseline + drift + control). The
-    # drift/control phases land with the next cast; the pinned replay assertions
-    # below are kept VERBATIM behind the pending guard so the suite stays green
-    # meanwhile.
-    if m3b_drift_phases_pending()
-        @test_skip "AC4 pending (full-rehearsal replay incl. drift/control) — lands with the drift/control cast"
+    # AC4's replay covers the WHOLE rehearsal (baseline + drift + control) and
+    # costs three full rehearsals (two in-process + one fresh child process).
+    # The drift/control phases landed with cast 2; the replay cast runs this
+    # item's pinned assertions — still pending behind its own guard.
+    if m3b_replay_pending()
+        @test_skip "AC4 pending (full-rehearsal replay, ~3× rehearsal wall-clock) — lands with the replay cast"
     else
 
     # fresh process OBJECTS, same seed — identical summaries (within-process ==)

@@ -19,13 +19,14 @@ noise:
   readout_confusion: {value: [[0.97, 0.03], [0.06, 0.94]], estimate: true, note: "synthetic placeholder matrix (2×2 against the transmon-ancilla marginal)"}
 drift_priors:
   chi_kHz:
-    process: ou
-    sigma_rel: 0.05
+    process: [ou, ramp]
+    sigma_rel: 0.01
     tau_days: 10
+    ramp_kHz_per_day: -3.0
 provenance:
   source: "Intonato M3b rehearsal fixture — bosonic seed-family schema shape (mirrors Strumento's synthetic-bosonic fixture)"
   measured: 2026-09-02
-  note: "All values synthetic; no device behind them. σ_rel is raised above the class-typical 0.008 so the rehearsal's drift epochs are diagnosable at synthetic scale; the OU process shape and τ carry the record family's class structure. The rehearsal harness builds its DriftPlan from THESE priors."
+  note: "All values synthetic; no device behind them. The χ prior composes the record family's OU shape (σ_rel, τ) with a class-realistic thermal-soak Ramp at the prior's own scale a 3 kHz/day thermal soak declared at rehearsal scale (the OU's mean-reversion toward the record value fights the soak — their steady-state tension sets the rehearsal's ~30 kHz drift excursion; σ_rel is the class-typical 0.01, cf. the Strumento bosonic fixture's 0.008). The soak is negative — the rehearsal's structured prep is fragile for χ drifting more negative (its comb pulse's detuning geometry), and the drift must exercise the fragile sector the loop has to track — the drift-process catalogue's monotone component — so the rehearsal's adapted-vs-frozen delta is unambiguous over its 3 epochs. The rehearsal harness builds its DriftPlan from THESE priors."
 tags: [device-twin, bosonic, fixture, m3b-rehearsal]
 ---
 
