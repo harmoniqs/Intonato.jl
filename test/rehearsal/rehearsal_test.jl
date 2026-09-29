@@ -159,3 +159,54 @@ println("M3B_DIGEST=", rehearsal_digest(s))
     @test length(digests) == 1
     @test digests[1] == rehearsal_digest(s1)
 end
+
+# The branches the M3b gate's own runs never reach (coverage fill, #45): the
+# density-matrix marginal path — the open-system slice the released-0.3.0
+# rehearsal documents as out of scope, but whose ρ_ii extraction is live
+# machinery — and the :baseline phases mode's no-control summary branch.
+@testitem "M3b rehearsal harness: density-marginal path + :baseline phases mode" tags =
+    [:m3b] begin
+    using Intonato
+    import Strumento
+    using LinearAlgebra
+    include(joinpath(@__DIR__, "rehearsal_harness.jl"))
+
+    # the density path: a vectorized density matrix (length 2d²) marginalizes
+    # through its diagonal — the same transmon populations the ket path yields
+    # for the same state (the item-1 ket check's density twin)
+    ψ = zeros(ComplexF64, M3B_N_TRANSMON * M3B_N_FOCK)
+    idx(n, m) = (n - 1) * M3B_N_TRANSMON + m          # cavity-major, transmon minor
+    ψ[idx(1, 2)] = 0.8
+    ψ[idx(4, 1)] = 0.6im
+    d = M3B_N_TRANSMON * M3B_N_FOCK
+    ρ = ψ * ψ'
+    iso_ρ = vcat(real(ρ)[:], imag(ρ)[:])
+    @test length(iso_ρ) == 2 * d^2
+    @test rehearsal_ancilla_marginal(iso_ρ) ≈ [0.6^2, 0.8^2] atol = 1e-12
+
+    # a mixed state: the diagonal marginal is additive over the mixture
+    φ = zeros(ComplexF64, d)
+    φ[idx(1, 3)] = 1.0
+    ρ2 = 0.5 * (ψ * ψ' + φ * φ')
+    @test rehearsal_ancilla_marginal(vcat(real(ρ2)[:], imag(ρ2)[:])) ≈
+          [0.5 * (0.6^2 + 1.0), 0.5 * 0.8^2] atol = 1e-12
+
+    # the shape guard: a length that is neither 2d (ket) nor 2d² (density) errors
+    @test_throws ErrorException rehearsal_ancilla_marginal(zeros(3))
+
+    # the :baseline phases mode: the static-truth phase only — the summary's
+    # control columns take the no-control branch (zeros, single checkpoints,
+    # no drift-epoch ledgers) while the baseline itself is the full gate's
+    # own bit-identical first phase (same seed, same machinery)
+    s = run_rehearsal(REHEARSAL_SEED; phases = :baseline)
+    @test s.phases === :baseline
+    @test s.est_error_max == 0.0
+    @test s.n_experiments_control == 0
+    @test s.F_control == [s.F_baseline]
+    @test s.J_control == [s.J_baseline]
+    @test isempty(s.truth_moved_on_advance)
+    @test s.converged_baseline
+
+    # the phases kwarg is closed: anything else is an ArgumentError
+    @test_throws ArgumentError run_rehearsal(REHEARSAL_SEED; phases = :nope)
+end
