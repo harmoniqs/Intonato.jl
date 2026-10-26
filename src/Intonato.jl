@@ -4,76 +4,14 @@ using Reexport
 @reexport using Piccolo
 @reexport using NamedTrajectories
 
-# ──── The soc substrate (Strumento ≥ 0.3) ─────────────────────────────────────
-# The convenience flip that came with the seam's relocation: `using Intonato` is
-# the one-stop import for the full stack — the loop chassis AND, through the new
-# dependency, the soc registry and its verbs (the substrate reexported the
-# chassis in Strumento ≤ 0.1; the chassis reexports the substrate now, matching
-# the dependency direction).
-#
-# NAME COLLISION — deliberate exclusion: both packages export `Measurement`.
-# This package's `Measurement` is the chassis type the hardware seam feeds, so
-# it governs; Strumento's (the substrate-owned duck-compatible twin returned by
-# `iq_to_measurements`) is deliberately NOT reexported — a blind
-# `@reexport using Strumento` would leave the name ambiguous in every
-# `using Intonato` scope. The seam converts at the factory
-# (src/hardware/strumento_experiment.jl) instead.
-#
-# The named list mirrors Strumento 0.3's registered base export surface (compat
-# pins the exact minor): the soc contract + its verbs, the channel-map policy,
-# the translation verb + record, and the readout conversion. The concrete socs
-# are NO LONGER here: 0.3's extension split moved them out of the parent
-# namespace (MockSoc → StrumentoPiccoloExt, StrumentoSoc →
-# StrumentoPythonCallExt) and extension exports never surface on the parent
-# module — see the extension-aware reach below and src/hardware/reexport_test.jl.
-@reexport using Strumento:
-    AbstractSoc,
-    execute!,
-    load_envelope!,
-    play_program!,
-    acquire,
-    dac_rate,
-    adc_rate,
-    QickChannelMap,
-    QickGenChannel,
-    pulse_to_envelopes,
-    QickProgram,
-    iq_to_measurements
-
 # NamedTrajectories ≥ 0.9.3 collides with Piccolo's top-level `duration` reexport
 # (TimeWarp's `duration` in the same reexport chain), which leaves `Piccolo.duration`
-# — and, through the reexports above, `Intonato.duration` — UNBOUND in fresh
+# — and, through the reexport above, `Intonato.duration` — UNBOUND in fresh
 # resolutions while still listed among the exports. Pin the binding to its
-# defining module (the same binding StrumentoPiccoloExt uses) until Piccolo ships
-# its fix (harmoniqs/Piccolo.jl#323); the reexport-surface testitem pins it here.
+# defining module until Piccolo ships its fix (harmoniqs/Piccolo.jl#323). The
+# pulse-sampling seam (src/hardware/soc.jl, src/hardware/translate.jl) reads the
+# pulse duration through this pin; the ownership-guard testitem pins it here.
 const duration = Piccolo.Quantum.Pulses.duration
-
-# The substrate's own module handle (the named reexport above binds its exported
-# names only, not the module itself). Used by the extension-aware soc reach below.
-import Strumento
-
-# ──── Extension-aware soc reach (Strumento ≥ 0.3) ─────────────────────────────
-# 0.3's extension split defines the concrete socs in package extensions, and on
-# Julia 1.12 extension exports NEVER surface on the parent module — `using
-# Strumento` cannot reach them. The Piccolo extension, however, is ALWAYS
-# attached when this package loads: Piccolo is a hard dependency here and is the
-# trigger that attaches StrumentoPiccoloExt, so the mock soc is bound once, at
-# module top level, straight from the attached extension (the empirically
-# verified reach mechanism; pinned in src/hardware/reexport_test.jl). The
-# delegation soc (StrumentoSoc, the PythonCall extension's type) is NOT reachable
-# from this package by design: this package's manifest carries no PythonCall, so
-# that extension never attaches — users who need it load PythonCall in their own
-# environment and reach the type through
-# `Base.get_extension(Strumento, :StrumentoPythonCallExt)`.
-const _StrumentoPiccoloExt = Base.get_extension(Strumento, :StrumentoPiccoloExt)
-const MockSoc = _StrumentoPiccoloExt.MockSoc
-export MockSoc
-
-# ──── Fresh-resolution hazard heal (Piccolo #323 / NamedTrajectories ≥ 0.9.3) ─
-# RETIRED at Strumento 0.3: the heal eval'd the defining-module `duration` binding
-# into Strumento's namespace, which under 0.3 has no Piccolo in scope (the extension
-# split) — the eval crashes at load. 0.3 binds its pulse-sampling seam from the
-# defining module itself (inside StrumentoPiccoloExt), so no heal is wanted.
 
 using LinearAlgebra
 using ForwardDiff   # used by measurement_functions/wigner.jl + pulse_ops/truncation.jl
@@ -142,18 +80,30 @@ include("problems/selectors_test.jl")
 # ──── Strategies (public concrete strategies for the chassis) ─────────────────
 include("strategies/low_rank_hessian_strategy.jl")
 
-# ──── Hardware seam (Strumento ≥ 0.3: backend adapter + experiment factory) ───
-# The closed-loop hardware seam, relocated from Strumento.jl's v0.1.x tree when
-# its v0.2 standalone release severed the inverted dependency edge. The soc
-# substrate lives below this package; the backend adapter and the experiment
-# factory that bridge pulse → soc → measurement live here, at the chassis.
+# ──── Hardware substrate (the soc contract; moved from Strumento.jl, #55) ─────
+# The soc contract + its verbs, the QICK channel map, the slow-DC control class,
+# the pulse → envelope translation, readout conversion, and the board-free
+# MockSoc. Defined here — this package owns the substrate.
+include("hardware/soc.jl")
+include("hardware/channel_map.jl")
+include("hardware/dc.jl")
+include("hardware/translate.jl")
+include("hardware/readout.jl")
+include("hardware/mock_soc.jl")
+
+# ──── Hardware seam (backend adapter + experiment factory) ────────────────────
+# The backend adapter and the experiment factory that bridge pulse → soc →
+# measurement. `StrumentoBackend` / `StrumentoExperiment` keep their names: they
+# name the Python strumento stack the real-board soc talks to.
 include("hardware/strumento_backend.jl")
 include("hardware/strumento_experiment.jl")
 include("hardware/integration_test.jl")
-include("hardware/reexport_test.jl")
+include("hardware/ownership_test.jl")
 
 # ──── Digital twins (Intonato.Twins; moved from Strumento.jl) ─────────────────
-# Drift processes, the twin-record loader, and the truth/belief/record twin.
+# Drift processes, the twin-record loader, the truth/belief/record twin, the
+# twin's soc face (TwinSoc), the twin wiring map, and the physics families.
+# Included after the hardware substrate: TwinSoc implements the soc contract.
 # A submodule, NOT exported at top level: it keeps generic verbs (`instantiate`,
 # `advance!`, `calibrate!`) out of this namespace — `using Intonato.Twins`.
 include("twins/Twins.jl")
@@ -169,8 +119,18 @@ export pauli_covariance, population_covariance, wigner_covariance
 export pauli, pop
 export AbstractHardwareBackend
 export upload_pulse!, trigger!, readout, sample_rate
-# The hardware seam (Strumento ≥ 0.3): the backend adapter over an AbstractSoc
-# and its experiment factory — relocated here from the substrate at its v0.2.
+# The soc substrate: the contract + its verbs, the channel map, the slow-DC
+# control class, the translation record + verb, readout conversion, the mock soc.
+export AbstractSoc
+export execute!, load_envelope!, play_program!, acquire, dac_rate, adc_rate
+export set_gate!, get_gate, gate_snapshot
+export QickChannelMap, QickGenChannel
+export DCAxis, DCAxisMap, gate_names, axis_for
+export pulse_to_envelopes, QickProgram
+export iq_to_measurements
+export MockSoc
+# The hardware seam: the backend adapter over an AbstractSoc and its experiment
+# factory.
 export StrumentoBackend, StrumentoExperiment
 export ExperimentRecord
 export AbstractExperimentLogger, NullExperimentLogger, InMemoryExperimentLogger, record!
