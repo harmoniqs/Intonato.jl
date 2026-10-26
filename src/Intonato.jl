@@ -152,6 +152,12 @@ include("hardware/strumento_experiment.jl")
 include("hardware/integration_test.jl")
 include("hardware/reexport_test.jl")
 
+# ──── Digital twins (Intonato.Twins; moved from Strumento.jl) ─────────────────
+# Drift processes, the twin-record loader, and the truth/belief/record twin.
+# A submodule, NOT exported at top level: it keeps generic verbs (`instantiate`,
+# `advance!`, `calibrate!`) out of this namespace — `using Intonato.Twins`.
+include("twins/Twins.jl")
+
 # ──── Exports ────────────────────────────────────────────────────────────────
 
 # Types
