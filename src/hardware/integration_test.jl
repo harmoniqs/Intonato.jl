@@ -1,10 +1,7 @@
-# Integration tests for the mock QILC→QICK loop, relocated here from Strumento.jl
-# (its src/integration_test.jl @ 12a05b4) together with the seam. These validate
+# Integration tests for the mock QILC→QICK loop. These validate
 # (1) the pulse→envelope→rollout translation is faithful (converges as the DAC rate
 # rises) and (2) the StrumentoExperiment composes with this package's
-# `PulseTuningProblem` chassis end-to-end. MockSoc (defined in Strumento 0.3's
-# Piccolo extension) arrives via the extension-aware reexport; the reexport
-# testitem pins the reach mechanism.
+# `PulseTuningProblem` chassis end-to-end over this package's own MockSoc.
 #
 # NOTE: algorithmic *convergence* of QILC through the QICK seam needs a concrete
 # tuning strategy, which ships in a separate private package. The chassis test
