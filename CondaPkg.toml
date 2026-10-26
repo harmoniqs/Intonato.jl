@@ -1,0 +1,11 @@
+# Intentionally declares NO Python dependencies.
+#
+# PythonCall rides only the test target (and is a weak dependency of the
+# package: it triggers IntonatoPythonCallExt). Python `strumento` and `qick`
+# (openquantumhardware/qick) live in the board's own Python environment — qick is
+# FPGA-side software, not a resolvable conda/PyPI package off-board. Declaring
+# nothing here keeps resolution trivial: `StrumentoSoc` / `StrumentoDCSource` do a
+# lazy `pyimport("strumento")` at construction time and expect it pre-installed
+# (point PythonCall at that interpreter with JULIA_CONDAPKG_BACKEND=Null and
+# JULIA_PYTHONCALL_EXE=/path/to/python). Without it, the extension testitems skip.
+[deps]
