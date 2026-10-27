@@ -20,10 +20,10 @@ struct TwinRecord
     family::String
     platform::String
     status::String
-    parameters::Dict{String, Any}
-    noise::Dict{String, Any}
-    drift_priors::Dict{String, Any}
-    provenance::Dict{String, Any}
+    parameters::Dict{String,Any}
+    noise::Dict{String,Any}
+    drift_priors::Dict{String,Any}
+    provenance::Dict{String,Any}
     body::String
 end
 
@@ -40,11 +40,12 @@ function load_record(path::AbstractString)
     text = read(path, String)
     m = match(_FM, text)
     m === nothing && throw(RecordError("$path: no YAML frontmatter block"))
-    fm = YAML.load(m.captures[1]; dicttype = Dict{String, Any})
+    fm = YAML.load(m.captures[1]; dicttype = Dict{String,Any})
     body = strip(m.captures[2])
 
     type_ = get(fm, "type", nothing)
-    type_ == "device-twin" || throw(RecordError("$path: `type` must be \"device-twin\", got $(repr(type_))"))
+    type_ == "device-twin" ||
+        throw(RecordError("$path: `type` must be \"device-twin\", got $(repr(type_))"))
     for field in ("id", "family", "parameters")
         haskey(fm, field) || throw(RecordError("$path: missing required field `$field`"))
     end
@@ -56,10 +57,10 @@ function load_record(path::AbstractString)
         string(fm["family"]),
         string(get(fm, "platform", fm["family"])),
         string(get(fm, "status", "seed")),
-        Dict{String, Any}(string(k) => v for (k, v) in params),
-        Dict{String, Any}(string(k) => v for (k, v) in get(fm, "noise", Dict())),
-        Dict{String, Any}(string(k) => v for (k, v) in get(fm, "drift_priors", Dict())),
-        Dict{String, Any}(string(k) => v for (k, v) in get(fm, "provenance", Dict())),
+        Dict{String,Any}(string(k) => v for (k, v) in params),
+        Dict{String,Any}(string(k) => v for (k, v) in get(fm, "noise", Dict())),
+        Dict{String,Any}(string(k) => v for (k, v) in get(fm, "drift_priors", Dict())),
+        Dict{String,Any}(string(k) => v for (k, v) in get(fm, "provenance", Dict())),
         body,
     )
 end
@@ -98,7 +99,8 @@ end
 
 @testitem "load_record — parses the transmon seed family (telegraph priors)" begin
     using Intonato.Twins
-    rec = load_record(joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "transmon.md"))
+    rec =
+        load_record(joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "transmon.md"))
     @test rec.id == "synthetic-transmon"
     @test rec.family == "transmon"
     @test rec.platform == "transmon"
@@ -155,7 +157,9 @@ end
 @testitem "load_record — provenance round-trips across the four seed families" begin
     using Intonato.Twins
     for family in ("bosonic", "transmon", "atoms", "spin")
-        rec = load_record(joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "$family.md"))
+        rec = load_record(
+            joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "$family.md"),
+        )
         @test occursin("Synthetic fixture", rec.provenance["source"])   # exact source string
         @test string(rec.provenance["measured"]) == "2026-08-28"        # the date round-trips
         @test occursin("synthetic", rec.provenance["note"])             # the note round-trips
@@ -166,13 +170,16 @@ end
 @testitem "load_record — defaults: platform ← family, status ← seed, empty maps" begin
     using Intonato.Twins
     path = joinpath(mktempdir(), "minimal.md")
-    write(path, "---\ntype: device-twin\nid: minimal\nfamily: bosonic\nparameters:\n  a: 1.0\n---\n# body\n")
+    write(
+        path,
+        "---\ntype: device-twin\nid: minimal\nfamily: bosonic\nparameters:\n  a: 1.0\n---\n# body\n",
+    )
     rec = load_record(path)
     @test rec.platform == "bosonic"                 # falls back to family
     @test rec.status == "seed"                      # the default status
-    @test rec.noise == Dict{String, Any}()
-    @test rec.drift_priors == Dict{String, Any}()
-    @test rec.provenance == Dict{String, Any}()
+    @test rec.noise == Dict{String,Any}()
+    @test rec.drift_priors == Dict{String,Any}()
+    @test rec.provenance == Dict{String,Any}()
     @test rec.body == "# body"                      # prose body, stripped
 end
 
@@ -180,15 +187,28 @@ end
     using Intonato.Twins
     dir = mktempdir()
     cases = [
-        ("no-id.md",     "---\ntype: device-twin\nfamily: bosonic\nparameters: {a: 1.0}\n---\nbody\n", "id"),
-        ("no-family.md", "---\ntype: device-twin\nid: x\nparameters: {a: 1.0}\n---\nbody\n", "family"),
-        ("no-params.md", "---\ntype: device-twin\nid: x\nfamily: bosonic\n---\nbody\n", "parameters"),
+        (
+            "no-id.md",
+            "---\ntype: device-twin\nfamily: bosonic\nparameters: {a: 1.0}\n---\nbody\n",
+            "id",
+        ),
+        (
+            "no-family.md",
+            "---\ntype: device-twin\nid: x\nparameters: {a: 1.0}\n---\nbody\n",
+            "family",
+        ),
+        (
+            "no-params.md",
+            "---\ntype: device-twin\nid: x\nfamily: bosonic\n---\nbody\n",
+            "parameters",
+        ),
     ]
     for (name, text, field) in cases
         path = joinpath(dir, name)
         write(path, text)
         err = try
-            load_record(path); nothing
+            load_record(path)
+            nothing
         catch e
             e
         end
@@ -200,9 +220,13 @@ end
 @testitem "load_record — a wrong type is rejected, naming the requirement" begin
     using Intonato.Twins
     path = joinpath(mktempdir(), "wrong-type.md")
-    write(path, "---\ntype: device\nid: x\nfamily: bosonic\nparameters: {a: 1.0}\n---\nbody\n")
+    write(
+        path,
+        "---\ntype: device\nid: x\nfamily: bosonic\nparameters: {a: 1.0}\n---\nbody\n",
+    )
     err = try
-        load_record(path); nothing
+        load_record(path)
+        nothing
     catch e
         e
     end
@@ -217,7 +241,8 @@ end
     path = joinpath(mktempdir(), "no-fm.md")
     write(path, "# just prose, no YAML block\n")
     err = try
-        load_record(path); nothing
+        load_record(path)
+        nothing
     catch e
         e
     end
@@ -229,7 +254,8 @@ end
     using Intonato.Twins
     path = joinpath(mktempdir(), "does-not-exist.md")
     err = try
-        load_record(path); nothing
+        load_record(path)
+        nothing
     catch e
         e
     end
@@ -240,9 +266,13 @@ end
 @testitem "load_record — non-mapping parameters are rejected" begin
     using Intonato.Twins
     path = joinpath(mktempdir(), "params-list.md")
-    write(path, "---\ntype: device-twin\nid: x\nfamily: bosonic\nparameters: [1, 2, 3]\n---\nbody\n")
+    write(
+        path,
+        "---\ntype: device-twin\nid: x\nfamily: bosonic\nparameters: [1, 2, 3]\n---\nbody\n",
+    )
     err = try
-        load_record(path); nothing
+        load_record(path)
+        nothing
     catch e
         e
     end

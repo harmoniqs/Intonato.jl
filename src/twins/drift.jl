@@ -114,18 +114,24 @@ Per-parameter drift composition: `DriftPlan(:omega => [proc1, proc2], ...)`.
 applied additively to its parameter; unspecified parameters pass through.
 """
 struct DriftPlan
-    procs::Dict{Symbol, Vector{DriftProcess}}
+    procs::Dict{Symbol,Vector{DriftProcess}}
 end
 
 function DriftPlan(pairs::Pair{Symbol}...)
-    procs = Dict{Symbol, Vector{DriftProcess}}()
+    procs = Dict{Symbol,Vector{DriftProcess}}()
     for (k, v) in pairs
         procs[k] = DriftProcess[p for p in v]
     end
     return DriftPlan(procs)
 end
 
-function apply(plan::DriftPlan, truth::Dict{Symbol, Float64}, dt::Real, rng::AbstractRNG; t::Real = 0.0)
+function apply(
+    plan::DriftPlan,
+    truth::Dict{Symbol,Float64},
+    dt::Real,
+    rng::AbstractRNG;
+    t::Real = 0.0,
+)
     out = copy(truth)
     for (param, procs) in plan.procs
         haskey(out, param) || continue
@@ -148,7 +154,7 @@ end
     rng = StableRNG(0xC0FFEE)
     xs = Float64[100.0]
     let x = 100.0
-        for _ in 1:2000
+        for _ = 1:2000
             x = step!(ou, x, 0.1, rng)
             push!(xs, x)
         end
@@ -157,7 +163,7 @@ end
     @test std(xs) ≈ 0.02 rtol = 0.25
 
     # starting far from mu: the ensemble mean reverts toward mu
-    ensemble_mean = mean(step!(ou, 110.0, 2.0, StableRNG(seed)) for seed in 1:2000)
+    ensemble_mean = mean(step!(ou, 110.0, 2.0, StableRNG(seed)) for seed = 1:2000)
     expected = 100.0 + 10.0 * exp(-0.5 * 2.0)
     @test ensemble_mean ≈ expected rtol = 0.05
 end
@@ -178,7 +184,7 @@ end
     ramp = Ramp(rate = 0.5)
     rng = StableRNG(1)
     let x = 10.0
-        for _ in 1:4
+        for _ = 1:4
             x = step!(ramp, x, 2.0, rng)
         end
         @test x == 10.0 + 0.5 * 8.0
@@ -194,14 +200,21 @@ end
     n = 5000
     xs = let x = 0.0
         acc = Float64[]
-        for _ in 1:n
+        for _ = 1:n
             x = step!(rt, x, 0.05, rng)
             push!(acc, x)
         end
         acc
     end
     # values only ever at the telegraph levels (within exact float arithmetic)
-    @test all(v -> v ∈ (-3.0, 0.0, 3.0) || isapprox(v, 3.0) || isapprox(v, -3.0) || isapprox(v, 0.0), xs)
+    @test all(
+        v ->
+            v ∈ (-3.0, 0.0, 3.0) ||
+            isapprox(v, 3.0) ||
+            isapprox(v, -3.0) ||
+            isapprox(v, 0.0),
+        xs,
+    )
     # symmetric rates → roughly half the time in each state
     frac_up = mean(>(1.5), xs)
     @test frac_up ≈ 0.5 atol = 0.1
@@ -226,7 +239,7 @@ end
         :omega => [Ramp(rate = 0.1)],
         :delta => [OrnsteinUhlenbeck(theta = 0.0, sigma = 0.0, mu = 0.0)],
     )
-    truth = Dict{Symbol, Float64}(:omega => 4.0, :delta => 0.2, :other => 9.9)
+    truth = Dict{Symbol,Float64}(:omega => 4.0, :delta => 0.2, :other => 9.9)
     rng = StableRNG(1)
     out = apply(plan, truth, 1.0, rng; t = 0.0)
     @test out[:omega] == 4.1
@@ -248,7 +261,7 @@ end
     # One step from a fixed x₀: the transition is Gaussian with
     # mean μ + (x₀-μ)e^{-θdt} and std σ√(1-e^{-2θdt}).
     ou = OrnsteinUhlenbeck(theta = 0.5, sigma = 0.02, mu = 100.0)
-    steps = [step!(ou, 110.0, 2.0, StableRNG(seed)) for seed in 1:20000]
+    steps = [step!(ou, 110.0, 2.0, StableRNG(seed)) for seed = 1:20000]
     @test mean(steps) ≈ 100.0 + 10.0 * exp(-1.0) rtol = 1e-3
     @test std(steps) ≈ 0.02 * sqrt(1 - exp(-2.0)) rtol = 0.01
 end
@@ -263,14 +276,16 @@ end
     theta, sigma, dt, n = 1.0, 0.1, 1.5, 6000
     ou = OrnsteinUhlenbeck(theta = theta, sigma = sigma, mu = 0.0)
     exact = let x = 0.0, acc = Float64[], rng = StableRNG(1234)
-        for _ in 1:n
-            x = step!(ou, x, dt, rng); push!(acc, x)
+        for _ = 1:n
+            x = step!(ou, x, dt, rng)
+            push!(acc, x)
         end
         acc
     end
     euler = let x = 0.0, acc = Float64[], rng = StableRNG(1234), sE = sigma * sqrt(2theta)
-        for _ in 1:n
-            x = x - theta * x * dt + sE * sqrt(dt) * randn(rng); push!(acc, x)
+        for _ = 1:n
+            x = x - theta * x * dt + sE * sqrt(dt) * randn(rng)
+            push!(acc, x)
         end
         acc
     end
@@ -287,16 +302,19 @@ end
     # AR(1) has (1-θdt)^k. At θdt = 0.5 those are 0.607 vs 0.5 — distinguishable.
     theta, sigma, dt, n = 1.0, 0.1, 0.5, 20000
     ou = OrnsteinUhlenbeck(theta = theta, sigma = sigma, mu = 0.0)
-    autocorr(v, lag) = (vv = v .- mean(v); sum(vv[1:end-lag] .* vv[1+lag:end]) / sum(vv .^ 2))
+    autocorr(v, lag) =
+        (vv = v .- mean(v); sum(vv[1:(end-lag)] .* vv[(1+lag):end]) / sum(vv .^ 2))
     exact = let x = 0.0, acc = Float64[], rng = StableRNG(42)
-        for _ in 1:n
-            x = step!(ou, x, dt, rng); push!(acc, x)
+        for _ = 1:n
+            x = step!(ou, x, dt, rng)
+            push!(acc, x)
         end
         acc
     end
     euler = let x = 0.0, acc = Float64[], rng = StableRNG(42), sE = sigma * sqrt(2theta)
-        for _ in 1:n
-            x = x - theta * x * dt + sE * sqrt(dt) * randn(rng); push!(acc, x)
+        for _ = 1:n
+            x = x - theta * x * dt + sE * sqrt(dt) * randn(rng)
+            push!(acc, x)
         end
         acc
     end
@@ -308,13 +326,18 @@ end
 @testitem "OrnsteinUhlenbeck — replay across fresh processes (bit-exact)" begin
     using Intonato.Twins
     using StableRNGs
-    trajectory(seed) = let ou = OrnsteinUhlenbeck(theta = 1.0, sigma = 0.03, mu = 0.0),
-                            rng = StableRNG(seed), x = 1.0, acc = Float64[]
-        for _ in 1:50
-            x = step!(ou, x, 0.05, rng); push!(acc, x)
+    trajectory(seed) =
+        let ou = OrnsteinUhlenbeck(theta = 1.0, sigma = 0.03, mu = 0.0),
+            rng = StableRNG(seed),
+            x = 1.0,
+            acc = Float64[]
+
+            for _ = 1:50
+                x = step!(ou, x, 0.05, rng)
+                push!(acc, x)
+            end
+            acc
         end
-        acc
-    end
     # FRESH process objects each call — replay must not depend on shared state
     @test trajectory(7) == trajectory(7)
     @test trajectory(7) != trajectory(8)
@@ -329,25 +352,36 @@ end
     ou = OrnsteinUhlenbeck(theta = 1.0, sigma = 0.03, mu = 0.0)
     rng = StableRNG(7)
     got = let x = 1.0, acc = Float64[]
-        for _ in 1:5
-            x = step!(ou, x, 0.05, rng); push!(acc, x)
+        for _ = 1:5
+            x = step!(ou, x, 0.05, rng)
+            push!(acc, x)
         end
         acc
     end
-    @test got == [0.932471738707425, 0.8941451344605106, 0.8459799475465459,
-                  0.7947853076362916, 0.7621492912296226]
+    @test got == [
+        0.932471738707425,
+        0.8941451344605106,
+        0.8459799475465459,
+        0.7947853076362916,
+        0.7621492912296226,
+    ]
 end
 
 @testitem "RandomTelegraph — replay across fresh processes (bit-exact)" begin
     using Intonato.Twins
     using StableRNGs
-    rt_traj(seed) = let rt = RandomTelegraph(gamma_up = 2.0, gamma_down = 2.0, amplitude = 3.0),
-                         rng = StableRNG(seed), x = 0.0, acc = Float64[]
-        for _ in 1:200
-            x = step!(rt, x, 0.05, rng); push!(acc, x)
+    rt_traj(seed) =
+        let rt = RandomTelegraph(gamma_up = 2.0, gamma_down = 2.0, amplitude = 3.0),
+            rng = StableRNG(seed),
+            x = 0.0,
+            acc = Float64[]
+
+            for _ = 1:200
+                x = step!(rt, x, 0.05, rng)
+                push!(acc, x)
+            end
+            acc
         end
-        acc
-    end
     @test rt_traj(99) == rt_traj(99)      # fresh process + fresh rng, same seed
     @test rt_traj(99) != rt_traj(100)     # different seed → different chain
 end
@@ -359,18 +393,25 @@ end
     # offset (state starts +1, applied 0), then the value is stationary.
     rt0 = RandomTelegraph(gamma_up = 0.0, gamma_down = 0.0, amplitude = 3.0)
     let x = 0.0, rng = StableRNG(5)
-        x = step!(rt0, x, 0.05, rng); @test x == 3.0
-        x = step!(rt0, x, 0.05, rng); @test x == 3.0
-        x = step!(rt0, x, 0.05, rng); @test x == 3.0
+        x = step!(rt0, x, 0.05, rng)
+        @test x == 3.0
+        x = step!(rt0, x, 0.05, rng)
+        @test x == 3.0
+        x = step!(rt0, x, 0.05, rng)
+        @test x == 3.0
     end
     # gamma → ∞: the chain flips every step; each step moves x by the offset
     # CHANGE (−3, then +6, then −6, …) — x only ever sits at ±amplitude.
     rtH = RandomTelegraph(gamma_up = 1e9, gamma_down = 1e9, amplitude = 3.0)
     let x = 0.0, rng = StableRNG(5)
-        x = step!(rtH, x, 0.05, rng); @test x == -3.0
-        x = step!(rtH, x, 0.05, rng); @test x == 3.0
-        x = step!(rtH, x, 0.05, rng); @test x == -3.0
-        x = step!(rtH, x, 0.05, rng); @test x == 3.0
+        x = step!(rtH, x, 0.05, rng)
+        @test x == -3.0
+        x = step!(rtH, x, 0.05, rng)
+        @test x == 3.0
+        x = step!(rtH, x, 0.05, rng)
+        @test x == -3.0
+        x = step!(rtH, x, 0.05, rng)
+        @test x == 3.0
     end
 end
 
@@ -389,16 +430,16 @@ end
     using Intonato.Twins
     using StableRNGs
     plan = DriftPlan(:omega => [Ramp(rate = 0.1), Ramp(rate = 0.2)])
-    truth = Dict{Symbol, Float64}(:omega => 4.0, :delta => 0.2)
+    truth = Dict{Symbol,Float64}(:omega => 4.0, :delta => 0.2)
     out = apply(plan, truth, 1.0, StableRNG(1); t = 0.0)
     @test out[:omega] == 4.3                 # both processes applied, additively
     @test out[:delta] == 0.2                 # unplanned parameter untouched
     @test truth[:omega] == 4.0               # pure function: input untouched
     # a plan naming a parameter the truth lacks is skipped, not an error
     plan2 = DriftPlan(:missing => [Ramp(rate = 1.0)])
-    out2 = apply(plan2, Dict{Symbol, Float64}(:omega => 4.0), 1.0, StableRNG(1))
-    @test out2 == Dict{Symbol, Float64}(:omega => 4.0)
+    out2 = apply(plan2, Dict{Symbol,Float64}(:omega => 4.0), 1.0, StableRNG(1))
+    @test out2 == Dict{Symbol,Float64}(:omega => 4.0)
     # the empty plan is the identity
-    @test apply(DriftPlan(), Dict{Symbol, Float64}(:a => 1.0), 1.0, StableRNG(1)) ==
-          Dict{Symbol, Float64}(:a => 1.0)
+    @test apply(DriftPlan(), Dict{Symbol,Float64}(:a => 1.0), 1.0, StableRNG(1)) ==
+          Dict{Symbol,Float64}(:a => 1.0)
 end

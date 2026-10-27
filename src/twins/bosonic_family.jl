@@ -16,11 +16,14 @@ function _bosonic_noise_value(record, key)
     haskey(record.noise, key) || error(
         "bosonic family: record $(repr(record.id)) carries no noise.$key — " *
         "the decay wiring requires it in the wrapped form " *
-        "{value: <number>, estimate, note}")
+        "{value: <number>, estimate, note}",
+    )
     wrapped = record.noise[key]
-    (wrapped isa AbstractDict && haskey(wrapped, "value") && wrapped["value"] isa Real) || error(
-        "bosonic family: noise.$key must be the wrapped form " *
-        "{value: <number>, estimate, note} (got $(typeof(wrapped)))")
+    (wrapped isa AbstractDict && haskey(wrapped, "value") && wrapped["value"] isa Real) ||
+        error(
+            "bosonic family: noise.$key must be the wrapped form " *
+            "{value: <number>, estimate, note} (got $(typeof(wrapped)))",
+        )
     return Float64(wrapped["value"])
 end
 
@@ -28,7 +31,8 @@ end
 function _bosonic_truth(truth::Dict{Symbol,Float64}, key::Symbol)
     haskey(truth, key) || error(
         "bosonic family: truth is missing :$key — the bosonic system is built " *
-        "from the CURRENT truth (record parameters enter truth at instantiate)")
+        "from the CURRENT truth (record parameters enter truth at instantiate)",
+    )
     return truth[key]
 end
 
@@ -37,7 +41,8 @@ function _bosonic_dim(truth::Dict{Symbol,Float64}, key::Symbol, min::Int)
     val = _bosonic_truth(truth, key)
     (isinteger(val) && val ≥ min) || error(
         "bosonic family: truth :$key must be an integer ≥ $min (got $val) — " *
-        "level counts are model dims, not physics values")
+        "level counts are model dims, not physics values",
+    )
     return Int(val)
 end
 
@@ -112,15 +117,17 @@ function bosonic_system_builder(record::TwinRecord)
     record.family == "bosonic" || error(
         "bosonic family: bosonic_system_builder got a $(repr(record.family)) " *
         "record ($(repr(record.id))) — the factory is keyed by the record's " *
-        "family field; build it from a bosonic record")
+        "family field; build it from a bosonic record",
+    )
     κ_c = _bosonic_noise_value(record, "kappa_c_per_us") * 1e-3   # per μs → per ns
     T1_q_us = _bosonic_noise_value(record, "T1_q_us")
     T1_q_us > 0 || error(
         "bosonic family: noise.T1_q_us must be > 0 (got $T1_q_us) — the decay " *
-        "rate is 1/T1")
+        "rate is 1/T1",
+    )
     γ₁ = 1e-3 / T1_q_us                                          # T1[μs] → per ns
     return function (truth::Dict{Symbol,Float64})
-        χ  = 2π * _bosonic_truth(truth, :chi_kHz) * 1e-6
+        χ = 2π * _bosonic_truth(truth, :chi_kHz) * 1e-6
         α_q = 2π * _bosonic_truth(truth, :K_q_GHz)
         α_c = 2π * _bosonic_truth(truth, :K_c_kHz) * 1e-6
         χ_p = 2π * _bosonic_truth(truth, :chi_p_kHz) * 1e-6
@@ -133,8 +140,11 @@ function bosonic_system_builder(record::TwinRecord)
         na, nq = a'a, q'q
 
         # Rotating-frame dispersive Hamiltonian (see the unit table above).
-        H_drift = χ * na * nq + (α_c / 2) * (a'^2 * a^2) +
-                  (α_q / 2) * (q'^2 * q^2) + χ_p * (a'^2 * a^2) * nq
+        H_drift =
+            χ * na * nq +
+            (α_c / 2) * (a'^2 * a^2) +
+            (α_q / 2) * (q'^2 * q^2) +
+            χ_p * (a'^2 * a^2) * nq
 
         # Linear quadrature drives: transmon I/Q then cavity I/Q. Bounds are
         # unit-symmetric placeholders — the record carries no drive bound and
@@ -142,11 +152,15 @@ function bosonic_system_builder(record::TwinRecord)
         H_drives = [(q + q') / 2, im * (q' - q) / 2, (a + a') / 2, im * (a' - a) / 2]
 
         # Lindblad decay (this order: cavity first, transmon second).
-        L_cavity   = kron(sqrt(κ_c) .* annihilate(n_f), Matrix{ComplexF64}(I, n_t, n_t))
+        L_cavity = kron(sqrt(κ_c) .* annihilate(n_f), Matrix{ComplexF64}(I, n_t, n_t))
         L_transmon = kron(Matrix{ComplexF64}(I, n_f, n_f), sqrt(γ₁) .* annihilate(n_t))
 
-        return OpenQuantumSystem(H_drift, H_drives, [1.0, 1.0, 1.0, 1.0];
-                                dissipators = [L_cavity, L_transmon])
+        return OpenQuantumSystem(
+            H_drift,
+            H_drives,
+            [1.0, 1.0, 1.0, 1.0];
+            dissipators = [L_cavity, L_transmon],
+        )
     end
 end
 
@@ -193,34 +207,36 @@ function bosonic_ancilla_populations(n_transmon::Integer, n_fock::Integer)
     d = n_transmon * n_fock
     d ≥ 2 || error(
         "bosonic family: the joint dimension must be ≥ 2 (got $d from " *
-        "$n_transmon transmon × $n_fock fock levels)")
+        "$n_transmon transmon × $n_fock fock levels)",
+    )
     return function (iso_state::AbstractVector{<:Real})
         n = length(iso_state)
         (n == 2 * d || n == 2 * d^2) || error(
             "bosonic family: the ancilla measurement expects an iso-packed " *
             "ket (length $(2d)) or vectorized density matrix (length $(2 * d^2)); " *
-            "got length $n")
+            "got length $n",
+        )
         d2 = d * d
         joint = Vector{Float64}(undef, d)
         if n == 2 * d2
             # density form (density_to_iso_vec(ρ) = ket_to_iso(vec(ρ)),
             # column-major): ρ_ii sits at iso position (i−1)·d + i. A physical
             # ρ has a real diagonal; the imaginary slot is its residue.
-            for i in 1:d
-                joint[i] = Float64(iso_state[(i - 1) * d + i])
+            for i = 1:d
+                joint[i] = Float64(iso_state[(i-1)*d+i])
             end
         else
             # ket form: |ψ|² per joint level
-            for i in 1:d
-                re, im_ = iso_state[i], iso_state[d + i]
+            for i = 1:d
+                re, im_ = iso_state[i], iso_state[d+i]
                 joint[i] = re^2 + im_^2
             end
         end
         # cavity-major basis: index i ↦ (fock, transmon) with transmon minor —
         # sum the fock axis. The ancilla marginal, in transmon-level order.
         p = zeros(Float64, n_transmon)
-        for i in 1:d
-            p[((i - 1) % n_transmon) + 1] += joint[i]
+        for i = 1:d
+            p[((i-1)%n_transmon)+1] += joint[i]
         end
         return p
     end
@@ -273,7 +289,7 @@ end
     sys = Twins.bosonic_system_builder(twin.record)(twin.truth)
 
     # the record's symbols in model units (the factory's documented table)
-    χ  = 2π * twin.truth[:chi_kHz] * 1e-6     # kHz → rad·GHz
+    χ = 2π * twin.truth[:chi_kHz] * 1e-6     # kHz → rad·GHz
     α_c = 2π * twin.truth[:K_c_kHz] * 1e-6
     α_q = 2π * twin.truth[:K_q_GHz]
     χ_p = 2π * twin.truth[:chi_p_kHz] * 1e-6
@@ -333,8 +349,8 @@ end
     truth2 = deepcopy(twin.truth)
     truth2[:chi_kHz] += 1000.0                        # +1 MHz
     sys2 = builder(truth2)
-    @test sys2.H_drift[idx(2, 2), idx(2, 2)] -
-          sys1.H_drift[idx(2, 2), idx(2, 2)] ≈ 2π * 1e-3 atol = 1e-18
+    @test sys2.H_drift[idx(2, 2), idx(2, 2)] - sys1.H_drift[idx(2, 2), idx(2, 2)] ≈
+          2π * 1e-3 atol = 1e-18
     # a Hamiltonian that is NOT a function of current truth (a cached
     # system) would return the unperturbed value — the shift is exact
 
@@ -351,9 +367,11 @@ end
 
     # ── wiring errors are actionable ──
     # a non-bosonic record: the factory is keyed by the record's family
-    spinrec = load_record(joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "spin.md"))
+    spinrec =
+        load_record(joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "spin.md"))
     err = try
-        Twins.bosonic_system_builder(spinrec); nothing
+        Twins.bosonic_system_builder(spinrec)
+        nothing
     catch e
         e
     end
@@ -364,15 +382,19 @@ end
     # a record without the decay noise: the missing noise key is named
     dir = mktempdir()
     path = joinpath(dir, "no-decay.md")
-    write(path, "---\ntype: device-twin\nid: x\nfamily: bosonic\n" *
-                "parameters:\n  chi_kHz: -298.4\n  K_q_GHz: -0.161\n" *
-                "  K_c_kHz: -12.3\n  chi_p_kHz: 0.0\n" *
-                "  N_transmon: 2\n  N_fock: 12\n" *
-                "noise:\n  T1_q_us: {value: 120.0, estimate: true}\n" *
-                "---\n# body\n")
+    write(
+        path,
+        "---\ntype: device-twin\nid: x\nfamily: bosonic\n" *
+        "parameters:\n  chi_kHz: -298.4\n  K_q_GHz: -0.161\n" *
+        "  K_c_kHz: -12.3\n  chi_p_kHz: 0.0\n" *
+        "  N_transmon: 2\n  N_fock: 12\n" *
+        "noise:\n  T1_q_us: {value: 120.0, estimate: true}\n" *
+        "---\n# body\n",
+    )
     rec = load_record(path)
     err = try
-        Twins.bosonic_system_builder(rec); nothing
+        Twins.bosonic_system_builder(rec)
+        nothing
     catch e
         e
     end
@@ -381,7 +403,8 @@ end
 
     # a truth missing a required parameter: named actionably
     err = try
-        builder(Dict{Symbol,Float64}(:chi_kHz => -298.4)); nothing
+        builder(Dict{Symbol,Float64}(:chi_kHz => -298.4))
+        nothing
     catch e
         e
     end
@@ -392,7 +415,8 @@ end
     bad = deepcopy(twin.truth)
     bad[:N_fock] = 12.5
     err = try
-        builder(bad); nothing
+        builder(bad)
+        nothing
     catch e
         e
     end
@@ -401,7 +425,8 @@ end
     bad = deepcopy(twin.truth)
     bad[:N_transmon] = 1.0
     err = try
-        builder(bad); nothing
+        builder(bad)
+        nothing
     catch e
         e
     end
@@ -413,8 +438,11 @@ end
     using Intonato.Twins
     using Piccolo
     using LinearAlgebra
-    twin = instantiate(joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "bosonic.md");
-                       drift = DriftPlan(), seed = 1)
+    twin = instantiate(
+        joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "bosonic.md");
+        drift = DriftPlan(),
+        seed = 1,
+    )
     n_t = Int(twin.truth[:N_transmon])
     n_f = Int(twin.truth[:N_fock])
     idx(n, m) = (n - 1) * n_t + m
@@ -468,17 +496,30 @@ end
     # |e,0⟩ decays freely (T1 e→g; the cavity starts in vacuum, so κ is not
     # visible in the ancilla marginal — it is live in the dissipator, pinned
     # in the factory test). Zero drives: the rolled pulse does nothing.
-    ψ_init = zeros(ComplexF64, n_t * n_f); ψ_init[idx(1, 2)] = 1.0   # |e,0⟩
-    ψ_goal = zeros(ComplexF64, n_t * n_f); ψ_goal[idx(1, 1)] = 1.0   # |g,0⟩
+    ψ_init = zeros(ComplexF64, n_t * n_f)
+    ψ_init[idx(1, 2)] = 1.0   # |e,0⟩
+    ψ_goal = zeros(ComplexF64, n_t * n_f)
+    ψ_goal[idx(1, 1)] = 1.0   # |g,0⟩
     T = 5000.0                                                        # ns
     N = 5
     pulse = LinearSplinePulse(zeros(Float64, 4, N), collect(range(0.0, T, length = N)))
-    map = QickChannelMap([QickGenChannel(0, 5e9; i_drive = 1, q_drive = 2),
-                         QickGenChannel(1, 6e9; i_drive = 3, q_drive = 4)]; n_drives = 4)
+    map = QickChannelMap(
+        [
+            QickGenChannel(0, 5e9; i_drive = 1, q_drive = 2),
+            QickGenChannel(1, 6e9; i_drive = 3, q_drive = 4),
+        ];
+        n_drives = 4,
+    )
 
-    soc = TwinSoc(twin, ψ_init, ψ_goal;
-                  families = Dict("bosonic" => builder),
-                  measurement_fn = meas, exact = true, dac_rate = 0.1)  # 501 samples
+    soc = TwinSoc(
+        twin,
+        ψ_init,
+        ψ_goal;
+        families = Dict("bosonic" => builder),
+        measurement_fn = meas,
+        exact = true,
+        dac_rate = 0.1,
+    )  # 501 samples
     nsamp = floor(Int, T * 0.1) + 1
     raw = execute!(soc, pulse, map, [nsamp])
     blob = real.(raw[1])
@@ -523,9 +564,14 @@ end
     # ── replay: the same seed through the soc reproduces bit-exact (the
     # Lindblad path is deterministic — no stochastic draws with dt = 0) ──
     twin2 = instantiate(fixture; drift = DriftPlan(), seed = 0xC0FFEE)
-    soc2 = TwinSoc(twin2, ψ_init, ψ_goal;
-                   families = Dict("bosonic" => builder),
-                   measurement_fn = meas, exact = true, dac_rate = 0.1)
+    soc2 = TwinSoc(
+        twin2,
+        ψ_init,
+        ψ_goal;
+        families = Dict("bosonic" => builder),
+        measurement_fn = meas,
+        exact = true,
+        dac_rate = 0.1,
+    )
     @test real.(execute!(soc2, pulse, map, [nsamp])[1]) == blob
 end
-

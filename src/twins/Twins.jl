@@ -49,7 +49,8 @@ import ..Intonato:
     get_gate,
     gate_snapshot,
     gate_names
-using ..Intonato: QickChannelMap, QickProgram, pulse_to_envelopes, populations, _played_pulse
+using ..Intonato:
+    QickChannelMap, QickProgram, pulse_to_envelopes, populations, _played_pulse
 
 include("drift.jl")
 include("records.jl")
@@ -67,14 +68,32 @@ end
     @test Intonato.Twins isa Module
     exported = names(Intonato.Twins)
     for n in (
-        :DriftProcess, :OrnsteinUhlenbeck, :Ramp, :RandomTelegraph, :JumpSchedule,
-        :DriftPlan, :step!, :apply,
-        :TwinRecord, :load_record, :RecordError,
-        :DigitalTwin, :instantiate, :believed, :advance!, :calibrate!,
-        :TwinSoc, :read_charge_sensor, :charge_sensor_sweep,
-        :TwinWiringMap, :TwinGenWiring, :wiring_for,
-        :bosonic_system_builder, :bosonic_ancilla_populations,
-        :spin_landscape_builder, :DoubleDotLandscape,
+        :DriftProcess,
+        :OrnsteinUhlenbeck,
+        :Ramp,
+        :RandomTelegraph,
+        :JumpSchedule,
+        :DriftPlan,
+        :step!,
+        :apply,
+        :TwinRecord,
+        :load_record,
+        :RecordError,
+        :DigitalTwin,
+        :instantiate,
+        :believed,
+        :advance!,
+        :calibrate!,
+        :TwinSoc,
+        :read_charge_sensor,
+        :charge_sensor_sweep,
+        :TwinWiringMap,
+        :TwinGenWiring,
+        :wiring_for,
+        :bosonic_system_builder,
+        :bosonic_ancilla_populations,
+        :spin_landscape_builder,
+        :DoubleDotLandscape,
     )
         @test n in exported
     end
@@ -82,20 +101,41 @@ end
     @test parentmodule(DigitalTwin) === Intonato.Twins
     @test parentmodule(OrnsteinUhlenbeck) === Intonato.Twins
     @test parentmodule(load_record) === Intonato.Twins
-    for T in (TwinSoc, TwinWiringMap, TwinGenWiring, DoubleDotLandscape,
-              Intonato.Twins.AbstractChargeLandscape)
+    for T in (
+        TwinSoc,
+        TwinWiringMap,
+        TwinGenWiring,
+        DoubleDotLandscape,
+        Intonato.Twins.AbstractChargeLandscape,
+    )
         @test parentmodule(T) === Intonato.Twins
     end
-    for f in (read_charge_sensor, charge_sensor_sweep, wiring_for,
-              bosonic_system_builder, bosonic_ancilla_populations,
-              spin_landscape_builder, Intonato.Twins.sensor_probabilities)
+    for f in (
+        read_charge_sensor,
+        charge_sensor_sweep,
+        wiring_for,
+        bosonic_system_builder,
+        bosonic_ancilla_populations,
+        spin_landscape_builder,
+        Intonato.Twins.sensor_probabilities,
+    )
         @test parentmodule(f) === Intonato.Twins
     end
     # the twin face implements the soc contract — the SAME function objects
     # Intonato's hardware substrate declares (extended, never shadowed)
     @test TwinSoc <: Intonato.AbstractSoc
-    for f in (:execute!, :acquire, :load_envelope!, :play_program!, :dac_rate,
-              :adc_rate, :set_gate!, :get_gate, :gate_snapshot, :gate_names)
+    for f in (
+        :execute!,
+        :acquire,
+        :load_envelope!,
+        :play_program!,
+        :dac_rate,
+        :adc_rate,
+        :set_gate!,
+        :get_gate,
+        :gate_snapshot,
+        :gate_names,
+    )
         @test getfield(Intonato.Twins, f) === getfield(Intonato, f)
     end
 end
@@ -103,22 +143,52 @@ end
 @testitem "Twins — Intonato's top-level export surface carries no twin names" begin
     top = names(Intonato)
     for n in (
-        :Twins, :DriftProcess, :OrnsteinUhlenbeck, :Ramp, :RandomTelegraph,
-        :JumpSchedule, :DriftPlan, :step!, :apply, :TwinRecord, :load_record,
-        :RecordError, :DigitalTwin, :instantiate, :believed, :advance!, :calibrate!,
-        :TwinSoc, :read_charge_sensor, :charge_sensor_sweep, :TwinWiringMap,
-        :TwinGenWiring, :wiring_for, :bosonic_system_builder,
-        :bosonic_ancilla_populations, :spin_landscape_builder, :DoubleDotLandscape,
-        :AbstractChargeLandscape, :sensor_probabilities,
+        :Twins,
+        :DriftProcess,
+        :OrnsteinUhlenbeck,
+        :Ramp,
+        :RandomTelegraph,
+        :JumpSchedule,
+        :DriftPlan,
+        :step!,
+        :apply,
+        :TwinRecord,
+        :load_record,
+        :RecordError,
+        :DigitalTwin,
+        :instantiate,
+        :believed,
+        :advance!,
+        :calibrate!,
+        :TwinSoc,
+        :read_charge_sensor,
+        :charge_sensor_sweep,
+        :TwinWiringMap,
+        :TwinGenWiring,
+        :wiring_for,
+        :bosonic_system_builder,
+        :bosonic_ancilla_populations,
+        :spin_landscape_builder,
+        :DoubleDotLandscape,
+        :AbstractChargeLandscape,
+        :sensor_probabilities,
     )
         @test !(n in top)
     end
     # the soc face, wiring and families are not even bound at top level
     for n in (
-        :TwinSoc, :read_charge_sensor, :charge_sensor_sweep, :TwinWiringMap,
-        :TwinGenWiring, :wiring_for, :bosonic_system_builder,
-        :bosonic_ancilla_populations, :spin_landscape_builder, :DoubleDotLandscape,
-        :AbstractChargeLandscape, :sensor_probabilities,
+        :TwinSoc,
+        :read_charge_sensor,
+        :charge_sensor_sweep,
+        :TwinWiringMap,
+        :TwinGenWiring,
+        :wiring_for,
+        :bosonic_system_builder,
+        :bosonic_ancilla_populations,
+        :spin_landscape_builder,
+        :DoubleDotLandscape,
+        :AbstractChargeLandscape,
+        :sensor_probabilities,
     )
         @test !isdefined(Intonato, n)
     end

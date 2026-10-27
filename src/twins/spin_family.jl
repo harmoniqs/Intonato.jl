@@ -27,7 +27,8 @@ const _NOISE_GRID_SPAN_SIGMAS = 6.0
 function _spin_truth(truth::Dict{Symbol,Float64}, key::Symbol)
     haskey(truth, key) || error(
         "spin family: truth is missing :$key — the charge landscape is built " *
-        "from the CURRENT truth (record parameters enter truth at instantiate)")
+        "from the CURRENT truth (record parameters enter truth at instantiate)",
+    )
     return truth[key]
 end
 
@@ -107,7 +108,7 @@ function _sensor_high_rounded(eps::Float64, t_c::Float64, sigma::Float64)
     du = 2.0 * _NOISE_GRID_SPAN_SIGMAS * sigma / _NOISE_GRID_INTERVALS
     inv_norm = 1.0 / (sqrt(2.0pi) * sigma)
     total = 0.5 * _sensor_high_bare(eps + lo, t_c) * exp(-lo^2 / (2.0 * sigma^2))
-    for k in 1:(_NOISE_GRID_INTERVALS - 1)
+    for k = 1:(_NOISE_GRID_INTERVALS-1)
         u = lo + k * du
         total += _sensor_high_bare(eps + u, t_c) * exp(-u^2 / (2.0 * sigma^2))
     end
@@ -126,8 +127,10 @@ read 0 V (the control-field default). Returns the 2-vector `[1 − p̃, p̃]` �
 the record's PSB confusion dimension; the soc's response machinery (confusion
 remap + binomial shots) turns it into the readout blob.
 """
-function sensor_probabilities(landscape::DoubleDotLandscape,
-                             gates::AbstractDict{<:AbstractString})
+function sensor_probabilities(
+    landscape::DoubleDotLandscape,
+    gates::AbstractDict{<:AbstractString},
+)
     vL = get(gates, landscape.gates[1], 0.0)
     vR = get(gates, landscape.gates[2], 0.0)
     eps = _SPIN_LEVER_ARM_MHZ_PER_V * (Float64(vL) - Float64(vR))
@@ -150,16 +153,19 @@ function spin_landscape_builder(record::TwinRecord)
     record.family == "spin" || error(
         "spin family: spin_landscape_builder got a $(repr(record.family)) " *
         "record ($(repr(record.id))) — the factory is keyed by the record's " *
-        "family field; build it from a spin record")
+        "family field; build it from a spin record",
+    )
     return function (truth::Dict{Symbol,Float64})
         J_max = _spin_truth(truth, :J_max_MHz)
         delta = _spin_truth(truth, :delta_MHz)
         J_max > 0 || error(
             "spin family: truth :J_max_MHz must be > 0 (got $J_max) — the " *
-            "anticrossing gap 2t_c = J_max is a scale, not a degeneracy")
+            "anticrossing gap 2t_c = J_max is a scale, not a degeneracy",
+        )
         delta ≥ 0 || error(
             "spin family: truth :delta_MHz must be ≥ 0 (got $delta) — the " *
-            "quasi-static charge-noise scale is a broadening width")
+            "quasi-static charge-noise scale is a broadening width",
+        )
         return DoubleDotLandscape(J_max / 2.0, delta, ["L", "R"])
     end
 end
@@ -191,9 +197,11 @@ export spin_landscape_builder, DoubleDotLandscape
 
     # ── wiring errors are actionable ──
     # a non-spin record: the factory is keyed by the record's family
-    bosrec = load_record(joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "bosonic.md"))
+    bosrec =
+        load_record(joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "bosonic.md"))
     err = try
-        Twins.spin_landscape_builder(bosrec); nothing
+        Twins.spin_landscape_builder(bosrec)
+        nothing
     catch e
         e
     end
@@ -203,7 +211,8 @@ export spin_landscape_builder, DoubleDotLandscape
 
     # a truth missing the declared scales: named actionably
     err = try
-        builder(Dict{Symbol,Float64}(:delta_MHz => 45.0)); nothing
+        builder(Dict{Symbol,Float64}(:delta_MHz => 45.0))
+        nothing
     catch e
         e
     end
@@ -211,17 +220,21 @@ export spin_landscape_builder, DoubleDotLandscape
     @test occursin(":J_max_MHz", sprint(showerror, err))
 
     # non-physical scales: named actionably
-    bad = deepcopy(twin.truth); bad[:J_max_MHz] = 0.0
+    bad = deepcopy(twin.truth)
+    bad[:J_max_MHz] = 0.0
     err = try
-        builder(bad); nothing
+        builder(bad)
+        nothing
     catch e
         e
     end
     @test err isa ErrorException
     @test occursin("J_max_MHz", sprint(showerror, err))
-    bad = deepcopy(twin.truth); bad[:delta_MHz] = -1.0
+    bad = deepcopy(twin.truth)
+    bad[:delta_MHz] = -1.0
     err = try
-        builder(bad); nothing
+        builder(bad)
+        nothing
     catch e
         e
     end
@@ -273,14 +286,15 @@ end
     # with the noise scale zeroed, the bare 10-90 width is the closed form
     # 1.886 * t_c volts (t_c = J_max/2, lever arm 1 GHz/V): the fixture's
     # J_max = 95 MHz -> ~0.09 V, within a semantic band (never a captured golden)
-    quiet = deepcopy(twin.truth); quiet[:delta_MHz] = 0.0
+    quiet = deepcopy(twin.truth)
+    quiet[:delta_MHz] = 0.0
     bare = Twins.spin_landscape_builder(twin.record)(quiet)
     cross(bare_land, target) = begin
         lo, hi = 0.0, 1.0
-        for _ in 1:60
+        for _ = 1:60
             mid = (lo + hi) / 2
             (Twins.sensor_probabilities(bare_land, Dict("L" => mid))[2] < target) ?
-                (lo = mid) : (hi = mid)
+            (lo = mid) : (hi = mid)
         end
         (lo + hi) / 2
     end
@@ -306,10 +320,9 @@ end
         lo, hi = 0.0, 2.0
         find(target) = begin
             lo, hi = 0.0, 2.0
-            for _ in 1:60
+            for _ = 1:60
                 mid = (lo + hi) / 2
-                (Twins.sensor_probabilities(landscape, Dict("L" => mid))[2] < target) ?
-                    (lo = mid) : (hi = mid)
+                (Twins.sensor_probabilities(landscape, Dict("L" => mid))[2] < target) ? (lo = mid) : (hi = mid)
             end
             (lo + hi) / 2
         end
@@ -317,10 +330,10 @@ end
     end
     mid_v(landscape) = begin
         lo, hi = -2.0, 2.0
-        for _ in 1:60
+        for _ = 1:60
             mid = (lo + hi) / 2
             (Twins.sensor_probabilities(landscape, Dict("L" => mid))[2] < 0.5) ?
-                (lo = mid) : (hi = mid)
+            (lo = mid) : (hi = mid)
         end
         (lo + hi) / 2
     end
@@ -330,13 +343,15 @@ end
     base_width = width(builder(twin.truth))
 
     # a seeded pin: perturb the exchange truth — the anticrossing gap opens
-    truth_J = deepcopy(twin.truth); truth_J[:J_max_MHz] *= 2.0
+    truth_J = deepcopy(twin.truth)
+    truth_J[:J_max_MHz] *= 2.0
     wJ = width(builder(truth_J))
     @test 1.5 < wJ / base_width < 2.1        # measured ~1.73 for this pair
     @test abs(mid_v(builder(truth_J))) < 0.005
 
     # perturb the charge-noise truth — the quasi-static rounding widens
-    truth_d = deepcopy(twin.truth); truth_d[:delta_MHz] *= 3.0
+    truth_d = deepcopy(twin.truth)
+    truth_d[:delta_MHz] *= 3.0
     wD = width(builder(truth_d))
     @test 1.6 < wD / base_width < 2.1        # measured ~1.86 for this pair
     @test abs(mid_v(builder(truth_d))) < 0.005
@@ -358,4 +373,3 @@ end
     @test believed(twin_d)["J_max_MHz"] == 95.0
     @test width(builder(twin_d.truth)) == w_after   # unchanged — truth is the input
 end
-

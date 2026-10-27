@@ -22,8 +22,8 @@ A device-shaped object the Loop runs against exactly as hardware:
 """
 mutable struct DigitalTwin
     record::TwinRecord
-    truth::Dict{Symbol, Float64}
-    belief::Dict{String, Any}
+    truth::Dict{Symbol,Float64}
+    belief::Dict{String,Any}
     plan::DriftPlan
     rng::StableRNG
     t::Float64
@@ -37,7 +37,7 @@ Build a twin from a vault record. Truth initializes at the record parameters
 """
 function instantiate(record_path::AbstractString; drift::DriftPlan, seed::Integer)
     record = load_record(record_path)
-    truth = Dict{Symbol, Float64}(
+    truth = Dict{Symbol,Float64}(
         Symbol(k) => float(v) for (k, v) in record.parameters if v isa Real
     )
     belief = deepcopy(record.parameters)
@@ -63,9 +63,8 @@ end
 @testitem "instantiate — truth from record, belief = record, seeded" begin
     using Intonato.Twins
     fixture = joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "bosonic.md")
-    plan = DriftPlan(
-        :chi_kHz => [OrnsteinUhlenbeck(theta = 0.07, sigma = 3.0, mu = -298.4)],
-    )
+    plan =
+        DriftPlan(:chi_kHz => [OrnsteinUhlenbeck(theta = 0.07, sigma = 3.0, mu = -298.4)])
     twin = instantiate(fixture; drift = plan, seed = 0xC0FFEE)
 
     @test twin.record.id == "synthetic-bosonic"
@@ -78,9 +77,7 @@ end
 @testitem "advance! — drift moves truth only; calibrate! moves belief only" begin
     using Intonato.Twins
     fixture = joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "bosonic.md")
-    plan = DriftPlan(
-        :chi_kHz => [Ramp(rate = -0.5)],
-    )
+    plan = DriftPlan(:chi_kHz => [Ramp(rate = -0.5)])
     twin = instantiate(fixture; drift = plan, seed = 1)
     chi0 = twin.truth[:chi_kHz]
 
@@ -100,12 +97,10 @@ end
 @testitem "replay — seeded twins drift identically" begin
     using Intonato.Twins
     fixture = joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "bosonic.md")
-    plan = DriftPlan(
-        :chi_kHz => [OrnsteinUhlenbeck(theta = 0.1, sigma = 1.0, mu = -298.4)],
-    )
+    plan = DriftPlan(:chi_kHz => [OrnsteinUhlenbeck(theta = 0.1, sigma = 1.0, mu = -298.4)])
     t1 = instantiate(fixture; drift = plan, seed = 7)
     t2 = instantiate(fixture; drift = plan, seed = 7)
-    for _ in 1:20
+    for _ = 1:20
         advance!(t1, 1.0)
         advance!(t2, 1.0)
     end
@@ -157,7 +152,7 @@ end
     plan = DriftPlan(:chi_kHz => [JumpSchedule(times = [2.0], deltas = [1.0])])
     twin = instantiate(fixture; drift = plan, seed = 1)
     seq = Float64[]
-    for _ in 1:3
+    for _ = 1:3
         advance!(twin, 1.0)
         push!(seq, twin.truth[:chi_kHz])
     end
@@ -183,15 +178,14 @@ end
 @testitem "replay — different seeds drift apart; a rerun reproduces exactly" begin
     using Intonato.Twins
     fixture = joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "bosonic.md")
-    plan = DriftPlan(
-        :chi_kHz => [OrnsteinUhlenbeck(theta = 0.1, sigma = 1.0, mu = -298.4)],
-    )
-    drift5(seed) = let twin = instantiate(fixture; drift = plan, seed = seed)
-        for _ in 1:5
-            advance!(twin, 1.0)
+    plan = DriftPlan(:chi_kHz => [OrnsteinUhlenbeck(theta = 0.1, sigma = 1.0, mu = -298.4)])
+    drift5(seed) =
+        let twin = instantiate(fixture; drift = plan, seed = seed)
+            for _ = 1:5
+                advance!(twin, 1.0)
+            end
+            copy(twin.truth)
         end
-        copy(twin.truth)
-    end
     @test drift5(7) != drift5(8)                     # different seeds → different truths
     @test drift5(7) == drift5(7)                     # same seed → identical, always
 end
@@ -202,22 +196,25 @@ end
     # before any adaptation: the bosonic fixture, plan OU(θ=0.1, σ=1.0, μ=-298.4)
     # on :chi_kHz, seed 7, five advance!(twin, 1.0). `==`, no tolerance.
     fixture = joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "bosonic.md")
-    plan = DriftPlan(
-        :chi_kHz => [OrnsteinUhlenbeck(theta = 0.1, sigma = 1.0, mu = -298.4)],
-    )
+    plan = DriftPlan(:chi_kHz => [OrnsteinUhlenbeck(theta = 0.1, sigma = 1.0, mu = -298.4)])
     twin = instantiate(fixture; drift = plan, seed = 7)
     got = Float64[]
-    for _ in 1:5
+    for _ = 1:5
         advance!(twin, 1.0)
         push!(got, twin.truth[:chi_kHz])
     end
-    @test got == [-299.26295263440176, -298.8518674225128, -299.0185224752866,
-                  -299.41675747150697, -299.0381663034378]
+    @test got == [
+        -299.26295263440176,
+        -298.8518674225128,
+        -299.0185224752866,
+        -299.41675747150697,
+        -299.0381663034378,
+    ]
     # the same twin rerun from the same seed reproduces the pin (a calibration
     # failure must reproduce exactly)
     twin2 = instantiate(fixture; drift = plan, seed = 7)
     got2 = Float64[]
-    for _ in 1:5
+    for _ = 1:5
         advance!(twin2, 1.0)
         push!(got2, twin2.truth[:chi_kHz])
     end

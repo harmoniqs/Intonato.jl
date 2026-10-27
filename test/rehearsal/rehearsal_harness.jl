@@ -465,9 +465,7 @@ end
 function _control_replay_plan(truth_path::Vector{Float64}, epoch_days::Float64)
     times = [(k - 1) * epoch_days for k = 1:(length(truth_path)-1)]
     deltas = [truth_path[k+1] - truth_path[k] for k = 1:(length(truth_path)-1)]
-    return Twins.DriftPlan(
-        :chi_kHz => [Twins.JumpSchedule(times = times, deltas = deltas)],
-    )
+    return Twins.DriftPlan(:chi_kHz => [Twins.JumpSchedule(times = times, deltas = deltas)])
 end
 
 function run_rehearsal(
@@ -606,10 +604,7 @@ function run_rehearsal(
             b_pre_cal = Twins.believed(twin)["chi_kHz"]
             χ_pre_cal = twin.truth[:chi_kHz]
             Twins.calibrate!(twin, Dict("chi_kHz" => devmodel.χ̂_kHz))
-            push!(
-                belief_moved_on_calibrate,
-                Twins.believed(twin)["chi_kHz"] != b_pre_cal,
-            )
+            push!(belief_moved_on_calibrate, Twins.believed(twin)["chi_kHz"] != b_pre_cal)
             push!(truth_moved_on_calibrate, twin.truth[:chi_kHz] != χ_pre_cal)
             push!(chi_believed, Twins.believed(twin)["chi_kHz"])
         end

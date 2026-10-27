@@ -24,8 +24,16 @@
 module IntonatoPythonCallExt
 
 import Intonato
-import Intonato: AbstractSoc, execute!, dac_rate, adc_rate, QickChannelMap,
-    DCAxisMap, set_gate!, get_gate, gate_snapshot
+import Intonato:
+    AbstractSoc,
+    execute!,
+    dac_rate,
+    adc_rate,
+    QickChannelMap,
+    DCAxisMap,
+    set_gate!,
+    get_gate,
+    gate_snapshot
 using TestItems
 
 using PythonCall
@@ -70,14 +78,21 @@ mutable struct StrumentoSoc <: AbstractSoc
     adc_rate::Float64
 end
 
-function StrumentoSoc(device; drive_map::Vector{<:Tuple}, dac_rate::Real, adc_rate::Real,
-                      board = nothing)
+function StrumentoSoc(
+    device;
+    drive_map::Vector{<:Tuple},
+    dac_rate::Real,
+    adc_rate::Real,
+    board = nothing,
+)
     st = try
         pyimport("strumento")
     catch e
-        error("StrumentoSoc requires the Python `strumento` package in the board's " *
-              "Python environment (the open QICK tProc-v2 framework this soc delegates " *
-              "to). `pyimport(\"strumento\")` failed: $e")
+        error(
+            "StrumentoSoc requires the Python `strumento` package in the board's " *
+            "Python environment (the open QICK tProc-v2 framework this soc delegates " *
+            "to). `pyimport(\"strumento\")` failed: $e",
+        )
     end
     dev = device isa Py ? device : st.Device.load(string(device))
     bd = board === nothing ? pybuiltins.None : board
@@ -100,8 +115,7 @@ adc_rate(soc::StrumentoSoc) = soc.adc_rate
 # is appended (`from_solution` plays pulses only — the compiler declares readout channels
 # only when it sees one), the program compiles and acquires, and the averaged IQ becomes
 # that knot's blob.
-function execute!(soc::StrumentoSoc, pulse, ::QickChannelMap,
-                  indices::Vector{Int})
+function execute!(soc::StrumentoSoc, pulse, ::QickChannelMap, indices::Vector{Int})
     T = Intonato.pulse_duration(pulse)
     nsamp = floor(Int, T * soc.dac_rate) + 1
     times = collect(range(0.0, T, length = nsamp))
@@ -119,16 +133,23 @@ function execute!(soc::StrumentoSoc, pulse, ::QickChannelMap,
 
     blobs = Vector{Vector{ComplexF64}}(undef, length(indices))
     for (j, k) in enumerate(indices)
-        (2 ≤ k ≤ nsamp) || error("StrumentoSoc.execute!: knot index $k outside the " *
+        (2 ≤ k ≤ nsamp) || error(
+            "StrumentoSoc.execute!: knot index $k outside the " *
             "playable pulse ($nsamp samples); knot 1 (t=0, before any evolution) has no " *
-            "delegated readout — the mock path owns that case")
+            "delegated readout — the mock path owns that case",
+        )
         knot_solution = pydict([
             "times" => pylist(times[1:k]),
-            "controls" => pydict([line => pylist(ctrls[d, 1:k])
-                                  for (d, line, role, _) in soc.drive_map]),
+            "controls" => pydict([
+                line => pylist(ctrls[d, 1:k]) for (d, line, role, _) in soc.drive_map
+            ]),
         ])
-        seq = from_solution(knot_solution; drive_map = py_drive_map,
-                            gain_calib = gain_calib, dac_rate = soc.dac_rate)
+        seq = from_solution(
+            knot_solution;
+            drive_map = py_drive_map,
+            gain_calib = gain_calib,
+            dac_rate = soc.dac_rate,
+        )
         seq.measure()   # pulses-only seq compiles with no readout channels otherwise
         prog = StrumentoProgram(soc.device; seq = seq, soc = soc.board)
         result = prog.acquire(soc.board, progress = false)
@@ -153,10 +174,14 @@ function _pi_pulse_reference(soc::StrumentoSoc)
     length_us = pyconvert(Float64, pc.length)
     sigma_us = pyconvert(Float64, pc.sigma)
     T_pi = length_us > 0 ? length_us : 6 * sigma_us   # gauss: played window ≈ 6σ
-    T_pi > 0 || error("StrumentoSoc: the calibration π pulse has no usable duration " *
-                      "(length=$length_us µs, sigma=$sigma_us µs)")
+    T_pi > 0 || error(
+        "StrumentoSoc: the calibration π pulse has no usable duration " *
+        "(length=$length_us µs, sigma=$sigma_us µs)",
+    )
     return pyimport("strumento.packs.cqed.calibration").PiPulseReference(
-        pi_gain_frac = gain_frac, pi_rabi_mhz = 0.5 / T_pi)
+        pi_gain_frac = gain_frac,
+        pi_rabi_mhz = 0.5 / T_pi,
+    )
 end
 
 # A single readout channel's averaged acquisition → one IQ sample. With no swept axis the
@@ -165,10 +190,14 @@ end
 # acquisition may carry float32 (the ADC's native width), which pyconvert will not widen.
 function _averaged_iq(result::Py)
     np = pyimport("numpy")
-    avgi = pyconvert(Vector{Float64}, np.asarray(result.avgi, dtype = "float64").reshape(-1))
-    avgq = pyconvert(Vector{Float64}, np.asarray(result.avgq, dtype = "float64").reshape(-1))
-    length(avgi) == 1 || error("StrumentoSoc: expected a single averaged readout, got " *
-                               "avgi with $(length(avgi)) entries")
+    avgi =
+        pyconvert(Vector{Float64}, np.asarray(result.avgi, dtype = "float64").reshape(-1))
+    avgq =
+        pyconvert(Vector{Float64}, np.asarray(result.avgq, dtype = "float64").reshape(-1))
+    length(avgi) == 1 || error(
+        "StrumentoSoc: expected a single averaged readout, got " *
+        "avgi with $(length(avgi)) entries",
+    )
     return ComplexF64(avgi[1], avgq[1])
 end
 
@@ -183,8 +212,10 @@ end
         # surface on the parent module, so reach it through its canonical handle.
         StrumentoSoc = Base.get_extension(Intonato, :IntonatoPythonCallExt).StrumentoSoc
         @test StrumentoSoc <: Intonato.AbstractSoc
-        @test hasmethod(Intonato.execute!,
-                        Tuple{StrumentoSoc,Any,QickChannelMap,Vector{Int}})
+        @test hasmethod(
+            Intonato.execute!,
+            Tuple{StrumentoSoc,Any,QickChannelMap,Vector{Int}},
+        )
         @test hasmethod(Intonato.dac_rate, Tuple{StrumentoSoc})
         @test hasmethod(Intonato.adc_rate, Tuple{StrumentoSoc})
         # Not constructed here: that needs the Python `strumento` package (the
@@ -214,7 +245,8 @@ end
         else
             fixtures = joinpath(pkgdir(Intonato), "test", "fixtures")
             board = pyimport("strumento.core.mock").MockQickSocV2.from_snapshot(
-                joinpath(fixtures, "_fixtures", "soccfg_v2_testbench.json"))
+                joinpath(fixtures, "_fixtures", "soccfg_v2_testbench.json"),
+            )
             dev = st.Device.load(joinpath(fixtures, "loopback_demo", "device.yaml"))
 
             # a small smooth pulse on one drive, sized in the testbench gen's REAL clocking:
@@ -223,8 +255,13 @@ end
             times = collect(range(0.0, 0.3, length = 180))
             pulse = LinearSplinePulse(0.05 .* sin.(range(0, π, length = 180))', times)
             cmap = QickChannelMap([QickGenChannel(0, 5e3; i_drive = 1)]; n_drives = 1)
-            soc = StrumentoSoc(dev; drive_map = [(1, "qubit", "drive", 4000.0)],
-                               dac_rate = 599.04, adc_rate = 599.04, board = board)
+            soc = StrumentoSoc(
+                dev;
+                drive_map = [(1, "qubit", "drive", 4000.0)],
+                dac_rate = 599.04,
+                adc_rate = 599.04,
+                board = board,
+            )
             @test dac_rate(soc) == 599.04
             @test adc_rate(soc) == 599.04
 
@@ -281,13 +318,17 @@ function StrumentoDCSource(axes::DCAxisMap; source = nothing)
     st = try
         pyimport("strumento")
     catch e
-        error("StrumentoDCSource requires the Python `strumento` package (its DC " *
-              "seam, strumento.core.dc). `pyimport(\"strumento\")` failed: $e")
+        error(
+            "StrumentoDCSource requires the Python `strumento` package (its DC " *
+            "seam, strumento.core.dc). `pyimport(\"strumento\")` failed: $e",
+        )
     end
     dc = pyimport("strumento.core.dc")
     src = source === nothing ? dc.MockVoltageSource() : source
-    pyaxes = pydict([name => dc.DCAxis(channel = ax.channel, max_v = ax.max_v)
-                     for (name, ax) in axes.axes])
+    pyaxes = pydict([
+        name => dc.DCAxis(channel = ax.channel, max_v = ax.max_v) for
+        (name, ax) in axes.axes
+    ])
     return StrumentoDCSource(dc.DCSource(src, pyaxes), axes)
 end
 
@@ -295,8 +336,10 @@ end
 # own message riding through (the Python surface owns the wording: the
 # unknown-axis list, the clamp's bound).
 function _pyseam_error(what::AbstractString, e)
-    return error("StrumentoDCSource: $what failed through the Python DC seam: " *
-                 sprint(showerror, e))
+    return error(
+        "StrumentoDCSource: $what failed through the Python DC seam: " *
+        sprint(showerror, e),
+    )
 end
 
 function set_gate!(bridge::StrumentoDCSource, gate::AbstractString, volts::Real)
@@ -358,7 +401,8 @@ end
 
             # the unknown axis is named actionably, the Python seam's message riding
             err = try
-                set_gate!(bridge, "barrier", 0.1); nothing
+                set_gate!(bridge, "barrier", 0.1)
+                nothing
             catch e
                 e
             end
@@ -369,7 +413,8 @@ end
 
             # the safety clamp fires THROUGH the seam (dc.py owns |v| ≤ max_v)
             err = try
-                set_gate!(bridge, "L", 1.5); nothing
+                set_gate!(bridge, "L", 1.5)
+                nothing
             catch e
                 e
             end

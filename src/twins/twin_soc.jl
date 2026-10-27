@@ -264,7 +264,8 @@ function acquire(soc::TwinSoc, _ro_chs)
         ρg = soc.ψ_goal * soc.ψ_goal'
         qtraj = DensityTrajectory(system, recon, ρ0, ρg)
         blobs = [
-            _respond(soc, soc.measurement_fn(density_to_iso_vec(qtraj(knot_times[k])))) for k in prog.indices
+            _respond(soc, soc.measurement_fn(density_to_iso_vec(qtraj(knot_times[k]))))
+            for k in prog.indices
         ]
     else
         qtraj = KetTrajectory(system, recon, soc.ψ_init, soc.ψ_goal)
@@ -422,23 +423,35 @@ end
 
     # The toy family (test-side): a QuantumSystem built from the twin's
     # CURRENT truth — two σx drives for the two envelope quadratures.
-    σx = ComplexF64[0 1; 1 0]; σz = ComplexF64[1 0; 0 -1]
-    toy_family(truth) = QuantumSystem(truth[:omega] * σz, [σx, σx],
-                                      [truth[:drive_bound], truth[:drive_bound]])
+    σx = ComplexF64[0 1; 1 0]
+    σz = ComplexF64[1 0; 0 -1]
+    toy_family(truth) = QuantumSystem(
+        truth[:omega] * σz,
+        [σx, σx],
+        [truth[:drive_bound], truth[:drive_bound]],
+    )
 
     fixture = joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "toy.md")
     twin = instantiate(fixture; drift = DriftPlan(), seed = 0xC0FFEE)
 
     # families is keyed by the RECORD's family field — dispatch, not registry
-    soc = TwinSoc(twin, ComplexF64[1, 0], ComplexF64[0, 1];
-                  families = Dict("toy" => toy_family),
-                  exact = true, dac_rate = 20.0)
+    soc = TwinSoc(
+        twin,
+        ComplexF64[1, 0],
+        ComplexF64[0, 1];
+        families = Dict("toy" => toy_family),
+        exact = true,
+        dac_rate = 20.0,
+    )
 
     # the fixed golden pulse — the MockSoc golden fixture's deterministic shape
-    N = 11; T = 5.0
+    N = 11
+    T = 5.0
     times = collect(range(0.0, T, length = N))
-    vals = 0.1 .* permutedims(hcat(sin.(range(0.0, 2.4π, length = N)),
-                                   cos.(range(0.3π, 1.7π, length = N))))
+    vals =
+        0.1 .* permutedims(
+            hcat(sin.(range(0.0, 2.4π, length = N)), cos.(range(0.3π, 1.7π, length = N))),
+        )
     pulse = LinearSplinePulse(vals, times)
     map = QickChannelMap([QickGenChannel(0, 5e9; i_drive = 1, q_drive = 2)]; n_drives = 2)
 
@@ -466,9 +479,13 @@ end
 
     # the default response is sampled (binomial shots): a valid probability
     # vector that deviates from the exact remap
-    soc_s = TwinSoc(instantiate(fixture; drift = DriftPlan(), seed = 0xC0FFEE),
-                    ComplexF64[1, 0], ComplexF64[0, 1];
-                    families = Dict("toy" => toy_family), dac_rate = 20.0)
+    soc_s = TwinSoc(
+        instantiate(fixture; drift = DriftPlan(), seed = 0xC0FFEE),
+        ComplexF64[1, 0],
+        ComplexF64[0, 1];
+        families = Dict("toy" => toy_family),
+        dac_rate = 20.0,
+    )
     raw_s = execute!(soc_s, pulse, map, [101])
     @test sum(real.(raw_s[1])) ≈ 1.0 atol = 1e-9
     @test real.(raw_s[1]) != real.(raw[2])
@@ -478,34 +495,68 @@ end
     using Intonato.Twins
     using Piccolo
     using LinearAlgebra
-    σx = ComplexF64[0 1; 1 0]; σz = ComplexF64[1 0; 0 -1]
-    toy_family(truth) = QuantumSystem(truth[:omega] * σz, [σx, σx],
-                                      [truth[:drive_bound], truth[:drive_bound]])
+    σx = ComplexF64[0 1; 1 0]
+    σz = ComplexF64[1 0; 0 -1]
+    toy_family(truth) = QuantumSystem(
+        truth[:omega] * σz,
+        [σx, σx],
+        [truth[:drive_bound], truth[:drive_bound]],
+    )
     fixture = joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "toy.md")
 
     # ── the record's confusion must be present and well-formed ──
     dir = mktempdir()
     function bad_record(name, noise_yaml)
         path = joinpath(dir, name)
-        write(path, "---\ntype: device-twin\nid: bad-$name\nfamily: toy\n" *
-                    "parameters:\n  omega: 1.0\n  drive_bound: 1.0\n" * noise_yaml *
-                    "---\n# body\n")
+        write(
+            path,
+            "---\ntype: device-twin\nid: bad-$name\nfamily: toy\n" *
+            "parameters:\n  omega: 1.0\n  drive_bound: 1.0\n" *
+            noise_yaml *
+            "---\n# body\n",
+        )
         return path
     end
     cases = [
-        ("no-noise.md",        "",                                                    "readout_confusion"),
-        ("no-key.md",          "noise:\n  T1_us: {value: 65.0, estimate: true}\n",     "readout_confusion"),
-        ("bare-matrix.md",     "noise:\n  readout_confusion: [[0.9, 0.1], [0.2, 0.8]]\n", "wrapped"),
-        ("no-value-key.md",    "noise:\n  readout_confusion: {estimate: true}\n",       "value"),
-        ("non-square.md",      "noise:\n  readout_confusion: {value: [[0.9, 0.1], [0.2]]}\n", "square"),
-        ("row-sums.md",        "noise:\n  readout_confusion: {value: [[0.9, 0.2], [0.1, 0.8]]}\n", "row"),
-        ("negative.md",        "noise:\n  readout_confusion: {value: [[1.1, -0.1], [0.0, 1.0]]}\n", "≥ 0"),
+        ("no-noise.md", "", "readout_confusion"),
+        (
+            "no-key.md",
+            "noise:\n  T1_us: {value: 65.0, estimate: true}\n",
+            "readout_confusion",
+        ),
+        (
+            "bare-matrix.md",
+            "noise:\n  readout_confusion: [[0.9, 0.1], [0.2, 0.8]]\n",
+            "wrapped",
+        ),
+        ("no-value-key.md", "noise:\n  readout_confusion: {estimate: true}\n", "value"),
+        (
+            "non-square.md",
+            "noise:\n  readout_confusion: {value: [[0.9, 0.1], [0.2]]}\n",
+            "square",
+        ),
+        (
+            "row-sums.md",
+            "noise:\n  readout_confusion: {value: [[0.9, 0.2], [0.1, 0.8]]}\n",
+            "row",
+        ),
+        (
+            "negative.md",
+            "noise:\n  readout_confusion: {value: [[1.1, -0.1], [0.0, 1.0]]}\n",
+            "≥ 0",
+        ),
     ]
     for (name, noise_yaml, needle) in cases
-        local twin = instantiate(bad_record(name, noise_yaml); drift = DriftPlan(), seed = 1)
+        local twin =
+            instantiate(bad_record(name, noise_yaml); drift = DriftPlan(), seed = 1)
         local err = try
-            TwinSoc(twin, ComplexF64[1, 0], ComplexF64[0, 1];
-                    families = Dict("toy" => toy_family)); nothing
+            TwinSoc(
+                twin,
+                ComplexF64[1, 0],
+                ComplexF64[0, 1];
+                families = Dict("toy" => toy_family),
+            )
+            nothing
         catch e
             e
         end
@@ -516,8 +567,13 @@ end
     # ── family dispatch: a record family with no builder is named loudly ──
     twin = instantiate(fixture; drift = DriftPlan(), seed = 1)
     err = try
-        TwinSoc(twin, ComplexF64[1, 0], ComplexF64[0, 1];
-                families = Dict("other" => toy_family)); nothing
+        TwinSoc(
+            twin,
+            ComplexF64[1, 0],
+            ComplexF64[0, 1];
+            families = Dict("other" => toy_family),
+        )
+        nothing
     catch e
         e
     end
@@ -527,23 +583,41 @@ end
     @test occursin("other", msg)        # the known families, listed
 
     # ── shots / dt bounds ──
-    @test_throws ErrorException TwinSoc(twin, ComplexF64[1, 0], ComplexF64[0, 1];
-                                        families = Dict("toy" => toy_family), shots = 0)
-    @test_throws ErrorException TwinSoc(twin, ComplexF64[1, 0], ComplexF64[0, 1];
-                                        families = Dict("toy" => toy_family), dt = -1.0)
+    @test_throws ErrorException TwinSoc(
+        twin,
+        ComplexF64[1, 0],
+        ComplexF64[0, 1];
+        families = Dict("toy" => toy_family),
+        shots = 0,
+    )
+    @test_throws ErrorException TwinSoc(
+        twin,
+        ComplexF64[1, 0],
+        ComplexF64[0, 1];
+        families = Dict("toy" => toy_family),
+        dt = -1.0,
+    )
 
     # ── the confusion must match the measurement dimension (at respond time) ──
     # a 3-level builder against the toy record's 2×2 confusion
-    σx3 = zeros(ComplexF64, 3, 3); σx3[1, 2] = σx3[2, 1] = 1.0
-    big_family(truth) = QuantumSystem(truth[:omega] * diagm([1.0, 0.0, -1.0]),
-                                      [σx3], [truth[:drive_bound]])
-    soc3 = TwinSoc(twin, ComplexF64[1, 0, 0], ComplexF64[0, 0, 1];
-                   families = Dict("toy" => big_family), exact = true, dac_rate = 20.0)
+    σx3 = zeros(ComplexF64, 3, 3)
+    σx3[1, 2] = σx3[2, 1] = 1.0
+    big_family(truth) =
+        QuantumSystem(truth[:omega] * diagm([1.0, 0.0, -1.0]), [σx3], [truth[:drive_bound]])
+    soc3 = TwinSoc(
+        twin,
+        ComplexF64[1, 0, 0],
+        ComplexF64[0, 0, 1];
+        families = Dict("toy" => big_family),
+        exact = true,
+        dac_rate = 20.0,
+    )
     N = 11
     pulse = LinearSplinePulse(0.1 .* randn(1, N), collect(range(0.0, 5.0, length = N)))
     map = QickChannelMap([QickGenChannel(0, 5e9; i_drive = 1)]; n_drives = 1)
     err = try
-        execute!(soc3, pulse, map, [N]); nothing
+        execute!(soc3, pulse, map, [N])
+        nothing
     catch e
         e
     end
@@ -555,20 +629,32 @@ end
     using Intonato.Twins
     using Piccolo
     using Statistics
-    σx = ComplexF64[0 1; 1 0]; σz = ComplexF64[1 0; 0 -1]
-    toy_family(truth) = QuantumSystem(truth[:omega] * σz, [σx, σx],
-                                      [truth[:drive_bound], truth[:drive_bound]])
+    σx = ComplexF64[0 1; 1 0]
+    σz = ComplexF64[1 0; 0 -1]
+    toy_family(truth) = QuantumSystem(
+        truth[:omega] * σz,
+        [σx, σx],
+        [truth[:drive_bound], truth[:drive_bound]],
+    )
     fixture = joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "toy.md")
     twin = instantiate(fixture; drift = DriftPlan(), seed = 0xBEEF)
-    soc = TwinSoc(twin, ComplexF64[1, 0], ComplexF64[0, 1];
-                  families = Dict("toy" => toy_family),
-                  shots = 512, dac_rate = 20.0)
+    soc = TwinSoc(
+        twin,
+        ComplexF64[1, 0],
+        ComplexF64[0, 1];
+        families = Dict("toy" => toy_family),
+        shots = 512,
+        dac_rate = 20.0,
+    )
 
     # the fixed golden pulse (the MockSoc golden fixture's shape)
-    N = 11; T = 5.0
+    N = 11
+    T = 5.0
     times = collect(range(0.0, T, length = N))
-    vals = 0.1 .* permutedims(hcat(sin.(range(0.0, 2.4π, length = N)),
-                                   cos.(range(0.3π, 1.7π, length = N))))
+    vals =
+        0.1 .* permutedims(
+            hcat(sin.(range(0.0, 2.4π, length = N)), cos.(range(0.3π, 1.7π, length = N))),
+        )
     pulse = LinearSplinePulse(vals, times)
     map = QickChannelMap([QickGenChannel(0, 5e9; i_drive = 1, q_drive = 2)]; n_drives = 2)
 
@@ -579,7 +665,7 @@ end
 
     K = 40
     freq0 = Float64[]
-    for _ in 1:K
+    for _ = 1:K
         blob = execute!(soc, pulse, map, [101])[1]
         r = real.(blob)
         # a sampled blob IS shot counts / shots: exact dyadic multiples of 1/512
@@ -604,14 +690,21 @@ end
 @testitem "TwinSoc drift: nonzero dt evolves truth between acquires; default static" begin
     using Intonato.Twins
     using Piccolo
-    σx = ComplexF64[0 1; 1 0]; σz = ComplexF64[1 0; 0 -1]
-    toy_family(truth) = QuantumSystem(truth[:omega] * σz, [σx, σx],
-                                      [truth[:drive_bound], truth[:drive_bound]])
+    σx = ComplexF64[0 1; 1 0]
+    σz = ComplexF64[1 0; 0 -1]
+    toy_family(truth) = QuantumSystem(
+        truth[:omega] * σz,
+        [σx, σx],
+        [truth[:drive_bound], truth[:drive_bound]],
+    )
     fixture = joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "toy.md")
-    N = 11; T = 5.0
+    N = 11
+    T = 5.0
     times = collect(range(0.0, T, length = N))
-    vals = 0.1 .* permutedims(hcat(sin.(range(0.0, 2.4π, length = N)),
-                                   cos.(range(0.3π, 1.7π, length = N))))
+    vals =
+        0.1 .* permutedims(
+            hcat(sin.(range(0.0, 2.4π, length = N)), cos.(range(0.3π, 1.7π, length = N))),
+        )
     pulse = LinearSplinePulse(vals, times)
     map = QickChannelMap([QickGenChannel(0, 5e9; i_drive = 1, q_drive = 2)]; n_drives = 2)
 
@@ -619,9 +712,15 @@ end
     # FIRST acquire sees the record's pristine truth. Ramp(0.1/day), dt = 1.
     plan = DriftPlan(:omega => [Ramp(rate = 0.1)])
     twin = instantiate(fixture; drift = plan, seed = 0xC0FFEE)
-    soc = TwinSoc(twin, ComplexF64[1, 0], ComplexF64[0, 1];
-                  families = Dict("toy" => toy_family),
-                  exact = true, dt = 1.0, dac_rate = 20.0)
+    soc = TwinSoc(
+        twin,
+        ComplexF64[1, 0],
+        ComplexF64[0, 1];
+        families = Dict("toy" => toy_family),
+        exact = true,
+        dt = 1.0,
+        dac_rate = 20.0,
+    )
 
     blob1 = execute!(soc, pulse, map, [11])[1]
     blob2 = execute!(soc, pulse, map, [11])[1]
@@ -629,15 +728,19 @@ end
     # acquire 1 measures the PRISTINE record truth — captured direct values
     # (transport tolerance as elsewhere: the literals crossed runners 1–5
     # ulp on CI run 33344813818 — hardware rotation, not semantics).
-    @test isapprox(blob1,
-                   [ComplexF64(0.9788483456466464 + 0.0im),
-                    ComplexF64(0.021151654353354598 + 0.0im)];
-                   rtol = 1e-13, atol = 1e-15)
+    @test isapprox(
+        blob1,
+        [ComplexF64(0.9788483456466464 + 0.0im), ComplexF64(0.021151654353354598 + 0.0im)];
+        rtol = 1e-13,
+        atol = 1e-15,
+    )
     # acquire 2 measures truth aged one dt (ω = 1.0 + 0.1·1.0) — captured
-    @test isapprox(blob2,
-                   [ComplexF64(0.9788684314249929 + 0.0im),
-                    ComplexF64(0.021131568575006088 + 0.0im)];
-                   rtol = 1e-13, atol = 1e-15)
+    @test isapprox(
+        blob2,
+        [ComplexF64(0.9788684314249929 + 0.0im), ComplexF64(0.021131568575006088 + 0.0im)];
+        rtol = 1e-13,
+        atol = 1e-15,
+    )
     # drift is real: consecutive acquires against the SAME pulse differ
     @test blob1 != blob2
     # the twin's clock advanced once per acquire
@@ -653,8 +756,14 @@ end
     # the clock never moves.
     jump_plan = DriftPlan(:omega => [JumpSchedule(times = [0.0], deltas = [0.5])])
     twin0 = instantiate(fixture; drift = jump_plan, seed = 0xC0FFEE)
-    soc0 = TwinSoc(twin0, ComplexF64[1, 0], ComplexF64[0, 1];
-                   families = Dict("toy" => toy_family), exact = true, dac_rate = 20.0)
+    soc0 = TwinSoc(
+        twin0,
+        ComplexF64[1, 0],
+        ComplexF64[0, 1];
+        families = Dict("toy" => toy_family),
+        exact = true,
+        dac_rate = 20.0,
+    )
     b1 = execute!(soc0, pulse, map, [11])[1]
     b2 = execute!(soc0, pulse, map, [11])[1]
     b3 = execute!(soc0, pulse, map, [11])[1]
@@ -668,20 +777,32 @@ end
     using Intonato.Twins
     using Piccolo
     using Piccolo.Quantum.Pulses: get_knot_times
-    σx = ComplexF64[0 1; 1 0]; σz = ComplexF64[1 0; 0 -1]
-    toy_family(truth) = QuantumSystem(truth[:omega] * σz, [σx, σx],
-                                      [truth[:drive_bound], truth[:drive_bound]])
+    σx = ComplexF64[0 1; 1 0]
+    σz = ComplexF64[1 0; 0 -1]
+    toy_family(truth) = QuantumSystem(
+        truth[:omega] * σz,
+        [σx, σx],
+        [truth[:drive_bound], truth[:drive_bound]],
+    )
     fixture = joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "toy.md")
     # drift OFF (empty plan; dt defaults to 0) + exact response
     twin = instantiate(fixture; drift = DriftPlan(), seed = 0xC0FFEE)
-    soc = TwinSoc(twin, ComplexF64[1, 0], ComplexF64[0, 1];
-                  families = Dict("toy" => toy_family),
-                  exact = true, dac_rate = 20.0)
+    soc = TwinSoc(
+        twin,
+        ComplexF64[1, 0],
+        ComplexF64[0, 1];
+        families = Dict("toy" => toy_family),
+        exact = true,
+        dac_rate = 20.0,
+    )
 
-    N = 11; T = 5.0
+    N = 11
+    T = 5.0
     times = collect(range(0.0, T, length = N))
-    vals = 0.1 .* permutedims(hcat(sin.(range(0.0, 2.4π, length = N)),
-                                   cos.(range(0.3π, 1.7π, length = N))))
+    vals =
+        0.1 .* permutedims(
+            hcat(sin.(range(0.0, 2.4π, length = N)), cos.(range(0.3π, 1.7π, length = N))),
+        )
     pulse = LinearSplinePulse(vals, times)
     map = QickChannelMap([QickGenChannel(0, 5e9; i_drive = 1, q_drive = 2)]; n_drives = 2)
     indices = [11, 101]
@@ -701,10 +822,15 @@ end
     # largest observed drift (5.1e-16 rel), ~4 orders below a semantic
     # forward-model change (≥1e-9). The in-test mirror (b) below stays
     # `==`: CI itself proved it box-immune on the failing run.
-    @test isapprox(raw,
-                   [ComplexF64[0.9788483456466464 + 0.0im, 0.021151654353354598 + 0.0im],
-                    ComplexF64[0.9379812245347385 + 0.0im, 0.06201877546526239 + 0.0im]];
-                   rtol = 1e-13, atol = 1e-15)
+    @test isapprox(
+        raw,
+        [
+            ComplexF64[0.9788483456466464+0.0im, 0.021151654353354598+0.0im],
+            ComplexF64[0.9379812245347385+0.0im, 0.06201877546526239+0.0im],
+        ];
+        rtol = 1e-13,
+        atol = 1e-15,
+    )
 
     # (b) the direct forward model computed HERE from public pieces — the
     # same translation, the same played-pulse reconstruction, the same
@@ -717,14 +843,14 @@ end
         q_drive === nothing || (ctrls[q_drive, :] .= qdata)
     end
     recon = LinearSplinePulse(ctrls, prog.times)
-    direct = KetTrajectory(toy_family(twin.truth), recon,
-                           ComplexF64[1, 0], ComplexF64[0, 1])
+    direct =
+        KetTrajectory(toy_family(twin.truth), recon, ComplexF64[1, 0], ComplexF64[0, 1])
     kt = get_knot_times(recon)
     rows = twin.record.noise["readout_confusion"]["value"]
     C = Matrix{Float64}([rows[i][j] for i in eachindex(rows), j in eachindex(rows)])
     confuse(p) = [sum(C[i, j] * p[i] for i in eachindex(p)) for j in eachindex(p)]
-    expected = [ComplexF64.(confuse(populations(ket_to_iso(direct(kt[k])))))
-                for k in indices]
+    expected =
+        [ComplexF64.(confuse(populations(ket_to_iso(direct(kt[k]))))) for k in indices]
     @test raw == expected
 
     # (c) the degenerate-twin relationship, demonstrated (not re-derived):
@@ -736,24 +862,39 @@ end
     # 33344813818 (hardware rotation), a semantic change is ≥1e-9.
     pops11 = populations(ket_to_iso(direct(kt[11])))
     pops101 = populations(ket_to_iso(direct(kt[101])))
-    @test isapprox(pops11, [0.9987748357943047, 0.0012251642056963555];
-                   rtol = 1e-13, atol = 1e-15)
-    @test isapprox(pops101, [0.9552991750369558, 0.044700824963045074];
-                   rtol = 1e-13, atol = 1e-15)
+    @test isapprox(
+        pops11,
+        [0.9987748357943047, 0.0012251642056963555];
+        rtol = 1e-13,
+        atol = 1e-15,
+    )
+    @test isapprox(
+        pops101,
+        [0.9552991750369558, 0.044700824963045074];
+        rtol = 1e-13,
+        atol = 1e-15,
+    )
 end
 
 @testitem "TwinSoc replay: identical seeds → identical sequences bit-exact (drift + shots)" begin
     using Intonato.Twins
     using Piccolo
-    σx = ComplexF64[0 1; 1 0]; σz = ComplexF64[1 0; 0 -1]
-    toy_family(truth) = QuantumSystem(truth[:omega] * σz, [σx, σx],
-                                      [truth[:drive_bound], truth[:drive_bound]])
+    σx = ComplexF64[0 1; 1 0]
+    σz = ComplexF64[1 0; 0 -1]
+    toy_family(truth) = QuantumSystem(
+        truth[:omega] * σz,
+        [σx, σx],
+        [truth[:drive_bound], truth[:drive_bound]],
+    )
     fixture = joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "toy.md")
     plan = DriftPlan(:omega => [OrnsteinUhlenbeck(theta = 0.1, sigma = 0.2, mu = 1.0)])
-    N = 11; T = 5.0
+    N = 11
+    T = 5.0
     times = collect(range(0.0, T, length = N))
-    vals = 0.1 .* permutedims(hcat(sin.(range(0.0, 2.4π, length = N)),
-                                   cos.(range(0.3π, 1.7π, length = N))))
+    vals =
+        0.1 .* permutedims(
+            hcat(sin.(range(0.0, 2.4π, length = N)), cos.(range(0.3π, 1.7π, length = N))),
+        )
     pulse = LinearSplinePulse(vals, times)
     map = QickChannelMap([QickGenChannel(0, 5e9; i_drive = 1, q_drive = 2)]; n_drives = 2)
 
@@ -762,12 +903,18 @@ end
     # objects each call — replay must not depend on shared state.
     function replay(seed)
         twin = instantiate(fixture; drift = plan, seed = seed)
-        soc = TwinSoc(twin, ComplexF64[1, 0], ComplexF64[0, 1];
-                      families = Dict("toy" => toy_family),
-                      shots = 64, dt = 1.0, dac_rate = 20.0)
+        soc = TwinSoc(
+            twin,
+            ComplexF64[1, 0],
+            ComplexF64[0, 1];
+            families = Dict("toy" => toy_family),
+            shots = 64,
+            dt = 1.0,
+            dac_rate = 20.0,
+        )
         omegas = Float64[]
         blobs = Vector{Vector{ComplexF64}}[]
-        for _ in 1:6
+        for _ = 1:6
             push!(blobs, execute!(soc, pulse, map, [11, 101]))
             push!(omegas, soc.twin.truth[:omega])
         end
@@ -790,21 +937,36 @@ end
     # then [drift: plan order]; the deterministic pieces were captured
     # pre-implementation in the drift and equivalence pins). `==`, no
     # tolerance: any deviation is a behavior change, never noise.
-    @test o1 == [1.0037869394647132, 0.8864476509337655, 1.0193670001043336,
-                 0.907558804064814, 1.004616903851481, 0.9007921139196429]
+    @test o1 == [
+        1.0037869394647132,
+        0.8864476509337655,
+        1.0193670001043336,
+        0.907558804064814,
+        1.004616903851481,
+        0.9007921139196429,
+    ]
     @test b1 == [
-        [ComplexF64[0.96875 + 0.0im, 0.03125 + 0.0im],
-         ComplexF64[0.96875 + 0.0im, 0.03125 + 0.0im]],
-        [ComplexF64[0.953125 + 0.0im, 0.046875 + 0.0im],
-         ComplexF64[0.953125 + 0.0im, 0.046875 + 0.0im]],
-        [ComplexF64[0.984375 + 0.0im, 0.015625 + 0.0im],
-         ComplexF64[0.9375 + 0.0im, 0.0625 + 0.0im]],
-        [ComplexF64[0.96875 + 0.0im, 0.03125 + 0.0im],
-         ComplexF64[0.96875 + 0.0im, 0.03125 + 0.0im]],
-        [ComplexF64[0.984375 + 0.0im, 0.015625 + 0.0im],
-         ComplexF64[0.859375 + 0.0im, 0.140625 + 0.0im]],
-        [ComplexF64[1.0 + 0.0im, 0.0 + 0.0im],
-         ComplexF64[0.9375 + 0.0im, 0.0625 + 0.0im]],
+        [
+            ComplexF64[0.96875+0.0im, 0.03125+0.0im],
+            ComplexF64[0.96875+0.0im, 0.03125+0.0im],
+        ],
+        [
+            ComplexF64[0.953125+0.0im, 0.046875+0.0im],
+            ComplexF64[0.953125+0.0im, 0.046875+0.0im],
+        ],
+        [
+            ComplexF64[0.984375+0.0im, 0.015625+0.0im],
+            ComplexF64[0.9375+0.0im, 0.0625+0.0im],
+        ],
+        [
+            ComplexF64[0.96875+0.0im, 0.03125+0.0im],
+            ComplexF64[0.96875+0.0im, 0.03125+0.0im],
+        ],
+        [
+            ComplexF64[0.984375+0.0im, 0.015625+0.0im],
+            ComplexF64[0.859375+0.0im, 0.140625+0.0im],
+        ],
+        [ComplexF64[1.0+0.0im, 0.0+0.0im], ComplexF64[0.9375+0.0im, 0.0625+0.0im]],
     ]
 end
 
@@ -837,7 +999,8 @@ end
 
     # an unknown gate is named actionably, with the landscape's gates listed
     err = try
-        set_gate!(soc, "barrier", 0.1); nothing
+        set_gate!(soc, "barrier", 0.1)
+        nothing
     catch e
         e
     end
@@ -845,7 +1008,8 @@ end
     msg = sprint(showerror, err)
     @test occursin("barrier", msg) && occursin("\"a\"", msg) && occursin("\"b\"", msg)
     err = try
-        get_gate(soc, "barrier"); nothing
+        get_gate(soc, "barrier")
+        nothing
     catch e
         e
     end
@@ -877,13 +1041,18 @@ end
     struct _ToyLandscape2 <: Twins.AbstractChargeLandscape end
     Twins.gate_names(::_ToyLandscape2) = ("a", "b")
     Twins.sensor_probabilities(::_ToyLandscape2, gates) = [0.5, 0.5]
-    soc = TwinSoc(twin, ComplexF64[1, 0], ComplexF64[0, 1];
-                  families = Dict("toy" => _ -> _ToyLandscape2()))
+    soc = TwinSoc(
+        twin,
+        ComplexF64[1, 0],
+        ComplexF64[0, 1];
+        families = Dict("toy" => _ -> _ToyLandscape2()),
+    )
     N = 11
     pulse = LinearSplinePulse(0.1 .* randn(1, N), collect(range(0.0, 5.0, length = N)))
     map = QickChannelMap([QickGenChannel(0, 5e9; i_drive = 1)]; n_drives = 1)
     err = try
-        execute!(soc, pulse, map, [N]); nothing
+        execute!(soc, pulse, map, [N])
+        nothing
     catch e
         e
     end
@@ -893,13 +1062,22 @@ end
     @test occursin("DC", msg)                        # where to drive it instead
 
     # ── a QUANTUM-SYSTEM family: the DC path refuses it ──
-    σx = ComplexF64[0 1; 1 0]; σz = ComplexF64[1 0; 0 -1]
-    toy_family(truth) = QuantumSystem(truth[:omega] * σz, [σx, σx],
-                                      [truth[:drive_bound], truth[:drive_bound]])
-    soc2 = TwinSoc(twin, ComplexF64[1, 0], ComplexF64[0, 1];
-                   families = Dict("toy" => toy_family))
+    σx = ComplexF64[0 1; 1 0]
+    σz = ComplexF64[1 0; 0 -1]
+    toy_family(truth) = QuantumSystem(
+        truth[:omega] * σz,
+        [σx, σx],
+        [truth[:drive_bound], truth[:drive_bound]],
+    )
+    soc2 = TwinSoc(
+        twin,
+        ComplexF64[1, 0],
+        ComplexF64[0, 1];
+        families = Dict("toy" => toy_family),
+    )
     err = try
-        set_gate!(soc2, "a", 0.1); nothing
+        set_gate!(soc2, "a", 0.1)
+        nothing
     catch e
         e
     end
@@ -930,8 +1108,9 @@ end
     p_direct = Twins.sensor_probabilities(landscape, soc.gates)
     rows = twin.record.noise["readout_confusion"]["value"]
     C = [Float64(rows[i][j]) for i in eachindex(rows), j in eachindex(rows)]
-    expected = [sum(C[i, j] * p_direct[i] for i in eachindex(p_direct))
-                for j in eachindex(p_direct)]
+    expected = [
+        sum(C[i, j] * p_direct[i] for i in eachindex(p_direct)) for j in eachindex(p_direct)
+    ]
     @test real.(blob) == expected
     # the confusion is APPLIED (the blob is not the raw sensor step)
     @test real.(blob) != p_direct
@@ -945,7 +1124,8 @@ end
     # measures truth at (k-1)·dt, THEN ages the twin ──
     plan = DriftPlan(:J_max_MHz => [Ramp(rate = 10.0)])
     twin_d = instantiate(fixture; drift = plan, seed = 7)
-    soc_d = Twins.TwinSoc(twin_d; families = Dict("spin" => builder), exact = true, dt = 1.0)
+    soc_d =
+        Twins.TwinSoc(twin_d; families = Dict("spin" => builder), exact = true, dt = 1.0)
     set_gate!(soc_d, "L", 0.3)                     # a flank point: width-sensitive
     b1 = Twins.read_charge_sensor(soc_d)
     @test twin_d.truth[:J_max_MHz] ≈ 105.0         # aged AFTER the pristine read
@@ -976,10 +1156,13 @@ end
     struct _BadLandscape <: Twins.AbstractChargeLandscape end
     Twins.gate_names(::_BadLandscape) = ("a",)
     Twins.sensor_probabilities(::_BadLandscape, gates) = [0.2, 0.3, 0.5]
-    soc_bad = Twins.TwinSoc(instantiate(fixture; drift = DriftPlan(), seed = 1);
-                          families = Dict("spin" => (_ -> _BadLandscape())))
+    soc_bad = Twins.TwinSoc(
+        instantiate(fixture; drift = DriftPlan(), seed = 1);
+        families = Dict("spin" => (_ -> _BadLandscape())),
+    )
     err = try
-        Twins.read_charge_sensor(soc_bad); nothing
+        Twins.read_charge_sensor(soc_bad)
+        nothing
     catch e
         e
     end
@@ -993,9 +1176,11 @@ end
     fixture = joinpath(pkgdir(Intonato), "test", "fixtures", "twins", "spin.md")
     builder = nothing   # resolved per twin below (the record is fixed)
     twin = instantiate(fixture; drift = DriftPlan(), seed = 0x5EED)
-    soc = Twins.TwinSoc(twin;
-                     families = Dict("spin" => Twins.spin_landscape_builder(twin.record)),
-                     exact = true)
+    soc = Twins.TwinSoc(
+        twin;
+        families = Dict("spin" => Twins.spin_landscape_builder(twin.record)),
+        exact = true,
+    )
     set_gate!(soc, "R", 0.0)
     vs = collect(range(-0.5, 0.5, length = 81))
     trace = Twins.charge_sensor_sweep(soc, "L", vs)
@@ -1015,7 +1200,8 @@ end
 
     # an unknown gate in a sweep is named actionably
     err = try
-        Twins.charge_sensor_sweep(soc, "barrier", vs[1:2]); nothing
+        Twins.charge_sensor_sweep(soc, "barrier", vs[1:2])
+        nothing
     catch e
         e
     end
@@ -1027,9 +1213,11 @@ end
     # crossing stays on the diagonal ──
     plan = DriftPlan(:J_max_MHz => [Ramp(rate = 47.5)])
     twin_d = instantiate(fixture; drift = plan, seed = 7)
-    soc_d = Twins.TwinSoc(twin_d;
-                        families = Dict("spin" => Twins.spin_landscape_builder(twin_d.record)),
-                        exact = true)
+    soc_d = Twins.TwinSoc(
+        twin_d;
+        families = Dict("spin" => Twins.spin_landscape_builder(twin_d.record)),
+        exact = true,
+    )
     t_before = Twins.charge_sensor_sweep(soc_d, "L", vs)
     advance!(twin_d, 1.0)
     t_after = Twins.charge_sensor_sweep(soc_d, "L", vs)
@@ -1046,9 +1234,11 @@ end
     # discipline: shots from the twin's rng, in sweep order) ──
     function sweep_replay(seed)
         t = instantiate(fixture; drift = DriftPlan(), seed = seed)
-        s = Twins.TwinSoc(t;
-                       families = Dict("spin" => Twins.spin_landscape_builder(t.record)),
-                       shots = 32)
+        s = Twins.TwinSoc(
+            t;
+            families = Dict("spin" => Twins.spin_landscape_builder(t.record)),
+            shots = 32,
+        )
         set_gate!(s, "R", 0.0)
         return Twins.charge_sensor_sweep(s, "L", vs)
     end
@@ -1060,4 +1250,3 @@ end
     # every sampled blob is shot counts / shots
     @test all(b -> all(x -> 32 * x == round(Int, 32 * x), real.(b)), r1)
 end
-
