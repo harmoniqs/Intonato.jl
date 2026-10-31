@@ -24,6 +24,12 @@
 # full rehearsal). run_rehearsal(seed) reproduces bit-exactly across fresh
 # processes; the digest serialization uses Float64 bit patterns (== at the bit
 # level, no cross-environment float goldens — the campaign CI rule).
+#
+# SOLVER PIN (#49): every QCP solve here passes `options = IpoptOptions(...)`
+# EXPLICITLY. Since DirectTrajOpt 0.11 (inherited by Piccolo) a bare
+# `solve!(qcp; max_iter = …)` runs MadNLP; the rehearsal's gate constants were
+# derived under Ipopt and the harness tests the QILC rehearsal contract, not
+# solver drift — so the solver is pinned, not left to the backend default.
 # ─────────────────────────────────────────────────────────────────────────────
 
 using LinearAlgebra
@@ -330,7 +336,11 @@ function Intonato.step(s::ModelReplanStrategy, ctx)
     traj = KetTrajectory(sys, ctx.pulse, s.ψ0, s.ψt)
     qcp = SplinePulseProblem(traj, M3B_N_KNOTS; Q = M3B_Q, R = M3B_R)
     t0 = time()
-    Piccolo.solve!(qcp; max_iter = s.max_ipopt_iter, verbose = false, print_level = 0)
+    Piccolo.solve!(
+        qcp;
+        options = Piccolo.IpoptOptions(max_iter = s.max_ipopt_iter, print_level = 0),
+        verbose = false,
+    )
     s.last_nlp = time() - t0
     # the candidate: z_ref's control block ← the replanned knots
     z = deepcopy(ctx.z_ref)
@@ -508,7 +518,11 @@ function run_rehearsal(
     #    prep warm start, polished by a deterministic Ipopt solve
     pulse0, times, ψt = structured_prep(believed_truth)
     qcp = nominal_qcp(believed_truth, pulse0, ψt)
-    Piccolo.solve!(qcp; max_iter = qcp_max_iter, verbose = false, print_level = 0)
+    Piccolo.solve!(
+        qcp;
+        options = Piccolo.IpoptOptions(max_iter = qcp_max_iter, print_level = 0),
+        verbose = false,
+    )
     pulse_solved = get_pulse(qcp.qtraj)
     F_baseline = truth_fidelity(believed_truth, pulse_solved, times, ψt)
 

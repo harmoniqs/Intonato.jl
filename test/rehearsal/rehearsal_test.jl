@@ -62,7 +62,8 @@
     # parameters (the QCP polish above the analytic construction)
     pulse, times, ψt = structured_prep(truth)
     qcp = nominal_qcp(truth, pulse, ψt)
-    solve!(qcp; max_iter = 12, verbose = false, print_level = 0)
+    # the same Ipopt-pinned polish as the harness's step 1 (#49)
+    solve!(qcp; options = IpoptOptions(max_iter = 12, print_level = 0), verbose = false)
     F = truth_fidelity(truth, qcp, times, ψt)
     @test F ≥ 0.99                                # the baseline gate (machinery: ≥0.998 demonstrated)
 end
