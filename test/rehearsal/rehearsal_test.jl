@@ -15,19 +15,19 @@
 #
 # The harness (test/rehearsal/rehearsal_harness.jl) is test-side code: the loop
 # chassis consumes public surface only (PulseTuningProblem, the backend adapter,
-# the experiment factory, the Fisher/IRLS weighting) over Strumento 0.3's public
-# twin face (TwinSoc, instantiate/advance!/calibrate!/believed, DriftPlan). Zero
-# Strumento-side edits; the bosonic family builder is a caller-provided TwinSoc
-# family (the seam's design).
+# the experiment factory, the Fisher/IRLS weighting) over the in-package twin
+# face, Intonato.Twins (TwinSoc, instantiate/advance!/calibrate!/believed,
+# DriftPlan); the bosonic family builder is a caller-provided TwinSoc family
+# (the seam's design).
 
 @testitem "M3b rehearsal harness: fixture, family physics, Ramsey prep" tags = [:m3b] begin
     using Intonato
-    import Strumento
+    import Intonato.Twins
     using LinearAlgebra
     include(joinpath(@__DIR__, "rehearsal_harness.jl"))
 
     # the committed fixture loads as a bosonic twin record with the documented shape
-    record = Strumento.load_record(rehearsal_fixture_path())
+    record = Twins.load_record(rehearsal_fixture_path())
     @test record.family == "bosonic"
     @test record.id == "synthetic-bosonic-rehearsal"
     @test record.parameters["chi_kHz"] == -300.0
@@ -71,7 +71,7 @@ end
 @testitem "M3b rehearsal: converge, drift, track, write back (adapted vs paired control)" tags =
     [:m3b] begin
     using Intonato
-    import Strumento
+    import Intonato.Twins
     using LinearAlgebra
     include(joinpath(@__DIR__, "rehearsal_harness.jl"))
 
@@ -118,7 +118,7 @@ end
 @testitem "M3b rehearsal: seeded replay is bit-exact (in-process + fresh child process)" tags =
     [:m3b] begin
     using Intonato
-    import Strumento
+    import Intonato.Twins
     include(joinpath(@__DIR__, "rehearsal_harness.jl"))
 
     # ── AC4 — seeded replay: the whole rehearsal reproduces bit-exactly ──────
@@ -144,7 +144,7 @@ end
 using Pkg
 Pkg.activate($(repr(dirname(Base.active_project()))))
 using Intonato
-import Strumento
+import Intonato.Twins
 include($(repr(joinpath(@__DIR__, "rehearsal_harness.jl"))))
 s = run_rehearsal($REHEARSAL_SEED; n_epochs = $M3B_REPLAY_EPOCHS)
 println("M3B_DIGEST=", rehearsal_digest(s))
@@ -168,7 +168,7 @@ end
 @testitem "M3b rehearsal harness: density-marginal path + :baseline phases mode" tags =
     [:m3b] begin
     using Intonato
-    import Strumento
+    import Intonato.Twins
     using LinearAlgebra
     include(joinpath(@__DIR__, "rehearsal_harness.jl"))
 
