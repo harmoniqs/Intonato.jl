@@ -1,16 +1,15 @@
-# StrumentoBackend — the AbstractHardwareBackend over an AbstractSoc (Strumento ≥ 0.3),
-# relocated here from Strumento.jl (its src/backend.jl @ 12a05b4) when Strumento's
-# v0.2 release severed the inverted dependency edge: the calibration-loop chassis
-# (this package) now sits ABOVE the soc substrate and owns the hardware seam.
+# StrumentoBackend — the AbstractHardwareBackend over an AbstractSoc (the soc
+# contract this package defines in src/hardware/soc.jl). The calibration-loop
+# chassis owns both the soc substrate and the hardware seam.
 #
 # The four backend verbs — upload_pulse! / trigger! / readout / sample_rate — are
 # declared AND exported by this package (types/hardware_backends.jl), so the adapter
 # extends them natively: same module, same function objects. The identity testitem
-# below pins that (the shadowing hazard behind Strumento PR #13 is
-# location-independent, so the identity assertion travels with the seam).
+# below pins that (a shadow declaration would silently split the contract into
+# two function objects).
 #
-# The soc owns *translation*: a MockSoc (Strumento's Piccolo extension) translates
-# the pulse in Julia (board-free rollout), while a StrumentoSoc hands the pulse to
+# The soc owns *translation*: a MockSoc (or the twin face, Intonato.Twins.TwinSoc)
+# translates the pulse in Julia (board-free rollout), while a StrumentoSoc hands the pulse to
 # Python `strumento`, which owns the pulse-IR → AveragerProgramV2 → acquire → reduce
 # path. So `execute!` is the one verb each soc implements; the backend just chains
 # upload → trigger → readout onto it. The QILC chassis never calls these directly;
@@ -20,8 +19,7 @@
 """
     StrumentoBackend(soc, channel_map, indices; discriminator = b -> real.(b))
 
-Hardware backend bridging a pulse to a soc (Strumento ≥ 0.3: `AbstractSoc` + its
-verbs). `indices` are the measurement knot indices (into `1:N`) the readout
+Hardware backend bridging a pulse to a soc (`AbstractSoc` + its verbs). `indices` are the measurement knot indices (into `1:N`) the readout
 produces; `discriminator` maps one IQ blob to a data vector (default: real part,
 matching `MockSoc`'s populations forward model). `last_raw` holds the most recent
 raw readout.
@@ -73,11 +71,6 @@ sample_rate(b::StrumentoBackend) = dac_rate(b.soc)
 @testitem "StrumentoBackend upload/trigger/readout against MockSoc" begin
     using Intonato
     using LinearAlgebra
-    # MockSoc arrives via the extension-aware reexport: Strumento 0.3 defines it
-    # in StrumentoPiccoloExt (extension exports never surface on the parent
-    # module on Julia 1.12), so Intonato binds it from the attached extension
-    # — Piccolo is a hard dep, so the extension is always loaded here — and
-    # re-exports it (the reexport testitem pins the mechanism).
     σx = ComplexF64[0 1; 1 0]
     σz = ComplexF64[1 0; 0 -1]
     sys = QuantumSystem(1.0 * σz, [σx], [1.0])
@@ -98,17 +91,16 @@ end
 
 @testitem "Backend generics are Intonato's own function objects (seam contract)" begin
     using Intonato
-    import Strumento
     # The AbstractHardwareBackend contract — upload_pulse! / trigger! / readout /
     # sample_rate — is declared AND exported by Intonato (types/hardware_backends.jl).
     # The relocated StrumentoBackend extends those very generics: same module, same
     # function objects. It must never gain shadow declarations — or the contract
     # silently splits into two function objects and works only by accident
-    # (the Strumento PR #13 hazard; the identity assertion travels with the seam).
+    # (the identity assertion travels with the seam).
     for f in (:upload_pulse!, :trigger!, :readout, :sample_rate)
         @test f in names(Intonato)                # Intonato owns the export …
         @test isdefined(Intonato, f)              # … and the binding is live …
-        @test !isdefined(Strumento, f)            # … with no substrate-side twin.
+        @test parentmodule(getfield(Intonato, f)) === Intonato   # … defined here.
     end
     # The relocated adapter's methods live on Intonato's own function objects.
     @test hasmethod(Intonato.upload_pulse!, Tuple{StrumentoBackend,AbstractPulse})

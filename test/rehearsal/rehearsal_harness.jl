@@ -5,17 +5,17 @@
 #   Intonato:  PulseTuningProblem + solve!, StrumentoBackend, StrumentoExperiment,
 #              MeasurementModel, Measurement, binomial_fisher_weights, Learn-less
 #              strategy seam (AbstractTuningStrategy / step / candidate_trajectory)
-#   Strumento: DigitalTwin contract (instantiate / advance! / calibrate! /
-#              believed), DriftPlan + OrnsteinUhlenbeck, TwinSoc (via the
-#              extension-aware reach — the same mechanism Intonato uses for
-#              MockSoc), QickChannelMap / QickGenChannel
+#   Intonato.Twins: DigitalTwin contract (instantiate / advance! / calibrate! /
+#              believed), DriftPlan + OrnsteinUhlenbeck, TwinSoc;
+#              QickChannelMap / QickGenChannel (Intonato top level)
 #
-# Zero Strumento-side edits. The bosonic family is a CALLER-PROVIDED TwinSoc
-# family (the seam's design — Strumento's own suite passes test-side builders
-# the same way): a closed `QuantumSystem` slice of the substrate's bosonic
-# family (dispersive + Kerr, transmon-ancilla ⊗ cavity, 4 quadrature drives).
-# The OpenQuantumSystem/decay slice rides Strumento main's post-0.3.0 dispatch
-# and is out of scope for the released-0.3.0 rehearsal (documented on #37).
+# The bosonic family is a CALLER-PROVIDED TwinSoc family (the seam's design —
+# the Twins suite passes test-side builders the same way): a closed
+# `QuantumSystem` slice of the bosonic family (dispersive + Kerr,
+# transmon-ancilla ⊗ cavity, 4 quadrature drives). The OpenQuantumSystem/decay
+# slice (Intonato.Twins.bosonic_system_builder) is out of scope for this
+# rehearsal (documented on #37); the closed slice keeps the gate's pinned
+# numbers unchanged across the substrate move (#55).
 #
 # REPLAY DISCIPLINE: the QCP's initial pulse is the ANALYTIC structured Ramsey
 # construction — no randomness at all — so the QCP solve is deterministic
@@ -34,6 +34,7 @@
 
 using LinearAlgebra
 import Piccolo
+import Intonato.Twins   # the in-package twin core + its soc face
 BLAS.set_num_threads(1)     # replay determinism: pin the BLAS thread count
 
 # ── the committed fixture (loaded fresh per rehearsal — replay discipline) ────
@@ -445,8 +446,7 @@ end
 
 # the twin → soc face → backend adapter → experiment factory stack (one per run)
 function _rehearsal_experiment(twin, ψt, chassis_mm, shots)
-    ext = Base.get_extension(Strumento, :StrumentoPiccoloExt)
-    soc = ext.TwinSoc(
+    soc = Twins.TwinSoc(
         twin,
         m3b_psi0(),
         ψt;
@@ -475,9 +475,7 @@ end
 function _control_replay_plan(truth_path::Vector{Float64}, epoch_days::Float64)
     times = [(k - 1) * epoch_days for k = 1:(length(truth_path)-1)]
     deltas = [truth_path[k+1] - truth_path[k] for k = 1:(length(truth_path)-1)]
-    return Strumento.DriftPlan(
-        :chi_kHz => [Strumento.JumpSchedule(times = times, deltas = deltas)],
-    )
+    return Twins.DriftPlan(:chi_kHz => [Twins.JumpSchedule(times = times, deltas = deltas)])
 end
 
 function run_rehearsal(
@@ -491,7 +489,7 @@ function run_rehearsal(
     phases in (:baseline, :full) ||
         throw(ArgumentError("phases must be :baseline or :full, got :$phases"))
 
-    record = Strumento.load_record(rehearsal_fixture_path())
+    record = Twins.load_record(rehearsal_fixture_path())
     believed_truth = rehearsal_truth(record)
 
     # the drift plan from the record's OWN drift priors: the record family's OU
@@ -503,14 +501,14 @@ function run_rehearsal(
     procs == ["ou", "ramp"] ||
         error("rehearsal: the fixture's χ prior must compose [ou, ramp], got $procs")
     σ_stat = Float64(prior["sigma_rel"]) * abs(believed_truth[:chi_kHz])
-    plan = Strumento.DriftPlan(
+    plan = Twins.DriftPlan(
         :chi_kHz => [
-            Strumento.OrnsteinUhlenbeck(
+            Twins.OrnsteinUhlenbeck(
                 theta = 1.0 / Float64(prior["tau_days"]),
                 sigma = σ_stat,
                 mu = believed_truth[:chi_kHz],
             ),
-            Strumento.Ramp(rate = Float64(prior["ramp_kHz_per_day"])),
+            Twins.Ramp(rate = Float64(prior["ramp_kHz_per_day"])),
         ],
     )
 
@@ -532,7 +530,7 @@ function run_rehearsal(
     W_task = Intonato.binomial_fisher_weights(shot_mm, y_goal)
 
     # 3. the twin + soc face + backend adapter + experiment factory
-    twin = Strumento.instantiate(rehearsal_fixture_path(); drift = plan, seed = seed)
+    twin = Twins.instantiate(rehearsal_fixture_path(); drift = plan, seed = seed)
     qexp = _rehearsal_experiment(twin, ψt, chassis_mm, shots)
 
     # 4. the adapting loop's machinery: the χ-tracking device model + the
@@ -593,10 +591,10 @@ function run_rehearsal(
         for k = 1:n_epochs
             # drift injection — truth moves, belief must hold
             χ_pre = twin.truth[:chi_kHz]
-            b_pre = Strumento.believed(twin)["chi_kHz"]
-            Strumento.advance!(twin, M3B_EPOCH_DAYS)
+            b_pre = Twins.believed(twin)["chi_kHz"]
+            Twins.advance!(twin, M3B_EPOCH_DAYS)
             push!(truth_moved_on_advance, twin.truth[:chi_kHz] != χ_pre)
-            push!(belief_moved_on_advance, Strumento.believed(twin)["chi_kHz"] != b_pre)
+            push!(belief_moved_on_advance, Twins.believed(twin)["chi_kHz"] != b_pre)
             push!(truth_path, twin.truth[:chi_kHz])
 
             # the QILC phase against the drifted truth: the chassis's adapt!
@@ -617,15 +615,12 @@ function run_rehearsal(
             push!(J_adapted, ptp.result.history[end].J_exp)
 
             # the belief write-back — calibration moves belief, never truth
-            b_pre_cal = Strumento.believed(twin)["chi_kHz"]
+            b_pre_cal = Twins.believed(twin)["chi_kHz"]
             χ_pre_cal = twin.truth[:chi_kHz]
-            Strumento.calibrate!(twin, Dict("chi_kHz" => devmodel.χ̂_kHz))
-            push!(
-                belief_moved_on_calibrate,
-                Strumento.believed(twin)["chi_kHz"] != b_pre_cal,
-            )
+            Twins.calibrate!(twin, Dict("chi_kHz" => devmodel.χ̂_kHz))
+            push!(belief_moved_on_calibrate, Twins.believed(twin)["chi_kHz"] != b_pre_cal)
             push!(truth_moved_on_calibrate, twin.truth[:chi_kHz] != χ_pre_cal)
-            push!(chi_believed, Strumento.believed(twin)["chi_kHz"])
+            push!(chi_believed, Twins.believed(twin)["chi_kHz"])
         end
 
         # ── 7. the paired no-adaptation control ───────────────────────────────
@@ -634,7 +629,7 @@ function run_rehearsal(
         # frozen at the believed parameters (NominalModel: adapt! is a no-op),
         # so the control's replans optimize against the stale model and cannot
         # track the drift
-        twin_c = Strumento.instantiate(
+        twin_c = Twins.instantiate(
             rehearsal_fixture_path();
             drift = _control_replay_plan(truth_path, M3B_EPOCH_DAYS),
             seed = seed,
@@ -662,7 +657,7 @@ function run_rehearsal(
         )
         n_exp_c = 0
         for k = 1:n_epochs
-            Strumento.advance!(twin_c, M3B_EPOCH_DAYS)   # fires the scheduled delta
+            Twins.advance!(twin_c, M3B_EPOCH_DAYS)   # fires the scheduled delta
             Piccolo.solve!(
                 ptp_c;
                 max_iter = M3B_ITERS_PER_EPOCH,
